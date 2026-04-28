@@ -22,6 +22,16 @@ Project_1/Project_1.srcs/utils_1/
 *.mcs
 *.prm
 
+# Simulation generated files
+sim_logs/
+xsim.dir/
+*.wdb
+*.pb
+webtalk_*.xml
+
+# Simulation results (tracked manually after each run)
+# sim_results/ — no ignorar: el CSV se versiona para evidencia
+
 # Temporary / OS files
 *.bak
 *~
