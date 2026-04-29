@@ -1,20 +1,12 @@
 // =============================================================================
 // Testbench   : tb_debounce
-// Description : Verifica la cadena completa sync_signal -> debounce -> bcd_counter,
-//               tal como se conectaria en el top del proyecto.
+// Description : Verifica la cadena completa sync_signal -> debounce -> bcd_counter.
 //
-//   TEST 1 - Reset                        : btn_pulse=0, btn_level=0, bcd=0x00
-//   TEST 2 - Rebote corto filtrado        : pulso < STABLE no cambia btn_level
-//   TEST 3 - Presion limpia               : btn_pulse=1 exactamente 1 ciclo
-//   TEST 4 - bcd_counter incrementa 1 vez : un pulso limpio incrementa el BCD
-//   TEST 5 - Rebote al soltar             : no genera pulsos extra
-//
-// Correcciones aplicadas:
-//   - Margen aumentado a STABLE+10 para absorber latencia de sync_signal (2 FF)
-//   - Eliminadas variables no usadas en TEST 2 (pulses_before, pulses_after)
-//   - Sin caracteres Unicode: -> en vez de flechas, PASS/FAIL en vez de simbolos
-//   - TEST 5 comentado correctamente como "Rebote al soltar"
-//   - TEST 4: comparacion de BCD simplificada convirtiendo a decimal
+//   TEST 1 - Reset              : btn_out=0, count_raw=0
+//   TEST 2 - Rebote corto       : pulso < STABLE no genera btn_out
+//   TEST 3 - Presion limpia     : btn_out=1 exactamente 1 ciclo
+//   TEST 4 - bcd_counter incr.  : un pulso limpio incrementa count_raw
+//   TEST 5 - Rebote al soltar   : no genera pulsos extra
 //
 // Simulador   : Vivado xsim (Artix-7 / Nexys A7)
 // Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
@@ -26,53 +18,56 @@ module tb_debounce;
 
     // -------------------------------------------------------------------------
     // Parametros
-    // STABLE pequeno para simulacion rapida (en hardware seria 500_000)
-    // MARGIN absorbe la latencia de 2 ciclos del sync_signal
+    // COUNT_MAX del debounce = (CLK_FREQ_HZ/1000)*DEBOUNCE_MS - 1
+    //   = (1000/1000)*(STABLE+1) - 1 = STABLE
+    // MARGIN absorbe latencia: 2 ciclos sync externo + 2 ciclos sync interno + STABLE
     // -------------------------------------------------------------------------
     parameter integer STABLE     = 10;
-    parameter integer MARGIN     = STABLE + 10;
+    parameter integer MARGIN     = STABLE + 15;
     parameter integer CLK_PERIOD = 10;
 
     // -------------------------------------------------------------------------
     // Senales
     // -------------------------------------------------------------------------
     reg  clk, rst;
-    reg  btn_raw;           // boton fisico (asincrono, con rebote)
+    reg  btn_raw;
 
-    wire sync_out;          // salida del sincronizador
-    wire btn_pulse;         // pulso limpio de 1 ciclo
-    wire btn_level;         // nivel estable del boton
+    wire sync_out;
+    wire btn_out;
 
-    wire [7:0] bcd;
+    wire [5:0] count_raw;
     wire       carry;
 
     // -------------------------------------------------------------------------
     // Cadena: sync_signal -> debounce -> bcd_counter
     // -------------------------------------------------------------------------
-    sync_signal SYNC (
+    sync_signal #(.WIDTH(1)) SYNC (
         .clk      (clk),
+        .rst      (rst),
         .async_in (btn_raw),
         .sync_out (sync_out)
     );
 
     debounce #(
-        .STABLE_COUNT(STABLE)
+        .DEBOUNCE_MS(STABLE + 1),
+        .CLK_FREQ_HZ(1000)
     ) DEB (
-        .clk       (clk),
-        .rst       (rst),
-        .btn_in    (sync_out),
-        .btn_pulse (btn_pulse),
-        .btn_level (btn_level)
+        .clk    (clk),
+        .rst    (rst),
+        .btn_in (sync_out),
+        .btn_out(btn_out)
     );
 
     bcd_counter #(
-        .MAX(6'd59)
+        .MAX_VAL(59)
     ) CNT (
-        .clk   (clk),
-        .rst   (rst),
-        .en    (btn_pulse),
-        .bcd   (bcd),
-        .carry (carry)
+        .clk      (clk),
+        .rst      (rst),
+        .clk_en   (btn_out),
+        .inc      (1'b0),
+        .dec      (1'b0),
+        .count    (count_raw),
+        .carry_out(carry)
     );
 
     // -------------------------------------------------------------------------
@@ -88,8 +83,7 @@ module tb_debounce;
     integer errors_test  = 0;
 
     // -------------------------------------------------------------------------
-    // Tarea: simula rebote - la senal alterna n_bounces veces
-    // Cada rebote dura bounce_cycles ciclos (debe ser < STABLE para ser filtrado)
+    // Tarea: simula rebote
     // -------------------------------------------------------------------------
     task bounce;
         input integer n_bounces;
@@ -105,7 +99,6 @@ module tb_debounce;
 
     // -------------------------------------------------------------------------
     // Tarea: presion limpia - sube MARGIN ciclos, baja MARGIN ciclos
-    // MARGIN > STABLE + 2 para absorber latencia del sync_signal
     // -------------------------------------------------------------------------
     task press_clean;
         begin
@@ -119,9 +112,9 @@ module tb_debounce;
     // =========================================================================
     // ESTIMULOS
     // =========================================================================
-    integer       pulse_count;
-    integer       bcd_dec_antes;
-    integer       bcd_dec_despues;
+    integer pulse_count;
+    integer count_antes;
+    integer count_despues;
 
     initial begin
         rst     = 1'b1;
@@ -139,55 +132,56 @@ module tb_debounce;
         // ------------------------------------------------------------------
         errors_test = 0;
         $display("\n[TEST 1] Reset sincrono");
-        if (btn_pulse !== 1'b0 || btn_level !== 1'b0 || bcd !== 8'h00) begin
+        if (btn_out !== 1'b0 || count_raw !== 6'd0) begin
             $display("  [FAIL] Estado incorrecto tras reset");
-            $display("         btn_pulse=%b btn_level=%b bcd=0x%02h",
-                     btn_pulse, btn_level, bcd);
+            $display("         btn_out=%b count_raw=%0d", btn_out, count_raw);
             errors_test  = errors_test  + 1;
             errors_total = errors_total + 1;
         end else
-            $display("  btn_pulse=%b btn_level=%b bcd=0x%02h -> PASS",
-                     btn_pulse, btn_level, bcd);
+            $display("  btn_out=%b count_raw=%0d -> PASS", btn_out, count_raw);
         rst = 1'b0;
-
-        // ------------------------------------------------------------------
-        // TEST 2: Rebote corto filtrado
-        // 4 rebotes de 3 ciclos cada uno (< STABLE=10) no deben pasar
-        // Variables no usadas eliminadas
-        // ------------------------------------------------------------------
-        errors_test = 0;
-        $display("\n[TEST 2] Rebote corto no pasa el filtro");
-        bounce(4, 3);
-        // Asegurar btn_raw queda en 0 al final del rebote
-        btn_raw = 1'b0;
-        repeat(MARGIN) @(posedge clk); #1;
-        if (btn_level !== 1'b0) begin
-            $display("  [FAIL] btn_level cambio con rebote corto (esperado 0)");
-            errors_test  = errors_test  + 1;
-            errors_total = errors_total + 1;
-        end else
-            $display("  btn_level=0 tras rebotes cortos -> PASS");
         if (errors_test == 0) $display("  Resultado: PASS");
         else                  $display("  Resultado: FAIL");
 
         // ------------------------------------------------------------------
-        // TEST 3: Presion limpia genera btn_pulse exactamente 1 ciclo
-        // MARGIN absorbe latencia de sync_signal (2 FF = 2 ciclos)
+        // TEST 2: Rebote corto filtrado
+        // 4 rebotes de 3 ciclos cada uno (< STABLE=10) no deben generar btn_out
         // ------------------------------------------------------------------
         errors_test = 0;
         pulse_count = 0;
-        $display("\n[TEST 3] Presion limpia genera btn_pulse de 1 ciclo");
+        $display("\n[TEST 2] Rebote corto no pasa el filtro");
+        bounce(4, 3);
+        btn_raw = 1'b0;
+        repeat(MARGIN) begin
+            @(posedge clk); #1;
+            if (btn_out) pulse_count = pulse_count + 1;
+        end
+        if (pulse_count !== 0) begin
+            $display("  [FAIL] btn_out se activo %0d vez(es) con rebotes cortos (esperado: 0)", pulse_count);
+            errors_test  = errors_test  + 1;
+            errors_total = errors_total + 1;
+        end else
+            $display("  btn_out=0 tras rebotes cortos -> PASS");
+        if (errors_test == 0) $display("  Resultado: PASS");
+        else                  $display("  Resultado: FAIL");
+
+        // ------------------------------------------------------------------
+        // TEST 3: Presion limpia genera btn_out exactamente 1 ciclo
+        // ------------------------------------------------------------------
+        errors_test = 0;
+        pulse_count = 0;
+        $display("\n[TEST 3] Presion limpia genera btn_out de 1 ciclo");
         btn_raw = 1'b1;
         repeat(MARGIN) begin
             @(posedge clk); #1;
-            if (btn_pulse) pulse_count = pulse_count + 1;
+            if (btn_out) pulse_count = pulse_count + 1;
         end
         btn_raw = 1'b0;
         repeat(MARGIN) @(posedge clk);
 
-        $display("  btn_pulse se activo %0d vez (esperado: 1)", pulse_count);
+        $display("  btn_out se activo %0d vez (esperado: 1)", pulse_count);
         if (pulse_count !== 1) begin
-            $display("  [FAIL] btn_pulse debe activarse exactamente 1 vez");
+            $display("  [FAIL] btn_out debe activarse exactamente 1 vez");
             errors_test  = errors_test  + 1;
             errors_total = errors_total + 1;
         end
@@ -196,22 +190,20 @@ module tb_debounce;
 
         // ------------------------------------------------------------------
         // TEST 4: bcd_counter incrementa exactamente 1 vez por presion
-        // Comparacion simplificada: convertir BCD a decimal antes y despues
-        // bcd_dec = decenas*10 + unidades
         // ------------------------------------------------------------------
-        errors_test   = 0;
-        bcd_dec_antes = bcd[7:4] * 10 + bcd[3:0];
+        errors_test  = 0;
+        count_antes  = count_raw;
         $display("\n[TEST 4] bcd_counter incrementa 1 vez por presion limpia");
-        $display("  BCD antes : 0x%02h (%0d decimal)", bcd, bcd_dec_antes);
+        $display("  count antes : %0d", count_antes);
 
         press_clean;
 
-        bcd_dec_despues = bcd[7:4] * 10 + bcd[3:0];
-        $display("  BCD despues: 0x%02h (%0d decimal)", bcd, bcd_dec_despues);
+        count_despues = count_raw;
+        $display("  count despues: %0d", count_despues);
 
-        if (bcd_dec_despues !== bcd_dec_antes + 1) begin
+        if (count_despues !== count_antes + 1) begin
             $display("  [FAIL] Incremento incorrecto: antes=%0d despues=%0d",
-                     bcd_dec_antes, bcd_dec_despues);
+                     count_antes, count_despues);
             errors_test  = errors_test  + 1;
             errors_total = errors_total + 1;
         end
@@ -220,25 +212,22 @@ module tb_debounce;
 
         // ------------------------------------------------------------------
         // TEST 5: Rebote al soltar no genera pulsos extra
-        // Presion limpia + rebote al soltar = exactamente 1 pulso total
         // ------------------------------------------------------------------
         errors_test = 0;
         pulse_count = 0;
         $display("\n[TEST 5] Rebote al soltar no genera pulsos extra");
 
-        // Presion limpia
         btn_raw = 1'b1;
         repeat(MARGIN) begin
             @(posedge clk); #1;
-            if (btn_pulse) pulse_count = pulse_count + 1;
+            if (btn_out) pulse_count = pulse_count + 1;
         end
 
-        // Rebote al soltar: 6 transiciones de 3 ciclos (< STABLE, filtradas)
         bounce(6, 3);
         btn_raw = 1'b0;
         repeat(MARGIN) begin
             @(posedge clk); #1;
-            if (btn_pulse) pulse_count = pulse_count + 1;
+            if (btn_out) pulse_count = pulse_count + 1;
         end
 
         $display("  Pulsos totales=%0d (esperado: 1)", pulse_count);
@@ -263,7 +252,6 @@ module tb_debounce;
         $finish;
     end
 
-    // Timeout de seguridad
     initial begin
         #(CLK_PERIOD * 50000);
         $display("[TIMEOUT] Simulacion excedio el tiempo limite.");

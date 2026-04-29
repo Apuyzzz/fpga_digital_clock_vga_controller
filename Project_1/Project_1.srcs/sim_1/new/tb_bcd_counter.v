@@ -1,18 +1,17 @@
 // =============================================================================
 // Testbench   : tb_bcd_counter
 // Description : Verifica bcd_counter parametrizado con MAX_VAL.
-//               El mismo testbench corre correctamente para MAX=59 y MAX=23
-//               porque todos los valores criticos (MAX-1, MAX) se calculan
+//               El mismo testbench corre correctamente para MAX_VAL=59 y
+//               MAX_VAL=23 porque todos los valores criticos se calculan
 //               automaticamente a partir de MAX_VAL.
 //
 //   Para probar seg/min: dejar MAX_VAL = 59
 //   Para probar horas  : cambiar MAX_VAL = 23
-//   El DUT y el TEST 3 se adaptan solos.
 //
-//   TEST 1 - Reset sincrono    : bcd debe quedar en 0x00
-//   TEST 2 - Conteo normal     : BCD correcto de 0 a 15
-//   TEST 3 - Rollover y carry  : verifica MAX-1, MAX y rollover dinamicamente
-//   TEST 4 - Enable gating     : sin en=1 el contador NO avanza
+//   TEST 1 - Reset sincrono    : count debe quedar en 0
+//   TEST 2 - Conteo normal     : count correcto de 0 a 15
+//   TEST 3 - Rollover y carry  : verifica MAX_VAL-1, MAX_VAL y rollover
+//   TEST 4 - Enable gating     : sin clk_en=1 el contador NO avanza
 //
 // Simulador   : Vivado xsim (Artix-7 / Nexys A7)
 // Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
@@ -23,8 +22,7 @@
 module tb_bcd_counter;
 
     // -------------------------------------------------------------------------
-    // PARAMETRO PRINCIPAL — cambiar aqui para probar MAX=59 o MAX=23
-    // El DUT y todos los calculos del testbench se adaptan automaticamente.
+    // PARAMETRO PRINCIPAL — cambiar aqui para probar MAX_VAL=59 o MAX_VAL=23
     // -------------------------------------------------------------------------
     parameter integer MAX_VAL    = 59;
     parameter integer CLK_PERIOD = 10;      // 100 MHz -> 10 ns
@@ -35,20 +33,22 @@ module tb_bcd_counter;
     reg        clk;
     reg        rst;
     reg        en;
-    wire [7:0] bcd;
+    wire [5:0] count_raw;
     wire       carry;
 
     // -------------------------------------------------------------------------
-    // DUT: usa MAX_VAL como parametro — no tiene valores fijos internamente
+    // DUT
     // -------------------------------------------------------------------------
     bcd_counter #(
-        .MAX(MAX_VAL[5:0])
+        .MAX_VAL(MAX_VAL)
     ) DUT (
-        .clk   (clk),
-        .rst   (rst),
-        .en    (en),
-        .bcd   (bcd),
-        .carry (carry)
+        .clk      (clk),
+        .rst      (rst),
+        .clk_en   (en),
+        .inc      (1'b0),
+        .dec      (1'b0),
+        .count    (count_raw),
+        .carry_out(carry)
     );
 
     // -------------------------------------------------------------------------
@@ -76,16 +76,16 @@ module tb_bcd_counter;
     endtask
 
     // -------------------------------------------------------------------------
-    // Tarea: verificacion de BCD y carry esperados
+    // Tarea: verificacion de count y carry esperados
     // -------------------------------------------------------------------------
     task check;
-        input [7:0]  exp_bcd;
+        input [5:0]  exp_val;
         input        exp_carry;
         input integer step;
         begin
-            if (bcd !== exp_bcd) begin
-                $display("  [FAIL] paso=%0d | BCD esperado=0x%02h | obtenido=0x%02h",
-                         step, exp_bcd, bcd);
+            if (count_raw !== exp_val) begin
+                $display("  [FAIL] paso=%0d | count esperado=%0d | obtenido=%0d",
+                         step, exp_val, count_raw);
                 errors_test  = errors_test  + 1;
                 errors_total = errors_total + 1;
             end
@@ -102,10 +102,9 @@ module tb_bcd_counter;
     // ESTIMULOS
     // =========================================================================
     integer i;
-    integer expected_bin_int;
-    reg [7:0] expected_bcd;
-    reg [7:0] bcd_at_max_minus1;
-    reg [7:0] bcd_at_max;
+    integer expected_val_int;
+    reg [5:0] bcd_at_max_minus1;
+    reg [5:0] bcd_at_max;
 
     initial begin
         rst = 1'b1;
@@ -123,68 +122,55 @@ module tb_bcd_counter;
         repeat(3) @(posedge clk); #1;
         rst = 1'b0;
         @(posedge clk); #1;
-        check(8'h00, 1'b0, 0);
-        $display("  bcd=0x%02h | carry=%b", bcd, carry);
+        check(6'd0, 1'b0, 0);
+        $display("  count=%0d | carry=%b", count_raw, carry);
         if (errors_test == 0) $display("  Resultado: PASS");
         else                  $display("  Resultado: FAIL");
 
         // ------------------------------------------------------------------
         // TEST 2: Conteo normal — primeros 15 pulsos
-        // expected_bcd calculado en dos lineas para compatibilidad xsim
         // ------------------------------------------------------------------
-        errors_test     = 0;
-        expected_bin_int = 0;
+        errors_test      = 0;
+        expected_val_int = 0;
         $display("\n[TEST 2] Conteo normal (15 pulsos)");
         for (i = 0; i < 15; i = i + 1) begin
             pulse_en;
-            expected_bin_int  = expected_bin_int + 1;
-            expected_bcd[7:4] = expected_bin_int / 10;
-            expected_bcd[3:0] = expected_bin_int % 10;
-            check(expected_bcd, 1'b0, i);
-            $display("  pulso %02d | bcd=0x%02h | dec=%0d | tens=%0d units=%0d",
-                     i+1, bcd, expected_bin_int, bcd[7:4], bcd[3:0]);
+            expected_val_int = expected_val_int + 1;
+            check(expected_val_int[5:0], 1'b0, i);
+            $display("  pulso %02d | count=%0d (esperado=%0d)",
+                     i+1, count_raw, expected_val_int);
         end
         if (errors_test == 0) $display("  Resultado: PASS");
         else                  $display("  Resultado: FAIL");
 
         // ------------------------------------------------------------------
         // TEST 3: Rollover y carry
-        // Todos los valores criticos calculados desde MAX_VAL:
-        //   MAX-1 : valor justo antes del maximo
-        //   MAX   : valor maximo
-        //   0x00  : valor despues del rollover
-        // Esto funciona igual para MAX=59 y MAX=23
         // ------------------------------------------------------------------
         errors_test = 0;
-        $display("\n[TEST 3] Rollover y carry en MAX=%0d", MAX_VAL);
+        $display("\n[TEST 3] Rollover y carry en MAX_VAL=%0d", MAX_VAL);
 
-        // Calcular BCD esperados desde MAX_VAL
-        bcd_at_max_minus1[7:4] = (MAX_VAL - 1) / 10;
-        bcd_at_max_minus1[3:0] = (MAX_VAL - 1) % 10;
-        bcd_at_max[7:4]        = MAX_VAL / 10;
-        bcd_at_max[3:0]        = MAX_VAL % 10;
+        bcd_at_max_minus1 = MAX_VAL - 1;
+        bcd_at_max        = MAX_VAL;
 
-        // Reset para partir limpio
         rst = 1'b1; @(posedge clk); #1; rst = 1'b0;
 
-        // Avanzar hasta MAX-1
+        // Avanzar hasta MAX_VAL-1
         for (i = 0; i < MAX_VAL - 1; i = i + 1) pulse_en;
 
-        // Verificar que estamos en MAX-1
-        $display("  En MAX-1 (%0d): bcd=0x%02h | esperado=0x%02h",
-                 MAX_VAL-1, bcd, bcd_at_max_minus1);
-        if (bcd !== bcd_at_max_minus1) begin
-            $display("  [FAIL] Valor incorrecto en MAX-1");
+        $display("  En MAX_VAL-1 (%0d): count=%0d | esperado=%0d",
+                 MAX_VAL-1, count_raw, bcd_at_max_minus1);
+        if (count_raw !== bcd_at_max_minus1) begin
+            $display("  [FAIL] Valor incorrecto en MAX_VAL-1");
             errors_test  = errors_test  + 1;
             errors_total = errors_total + 1;
         end
 
-        // Un pulso mas: llegar a MAX
+        // Un pulso mas: llegar a MAX_VAL
         pulse_en;
-        $display("  En MAX   (%0d): bcd=0x%02h | esperado=0x%02h",
-                 MAX_VAL, bcd, bcd_at_max);
-        if (bcd !== bcd_at_max) begin
-            $display("  [FAIL] Valor incorrecto en MAX");
+        $display("  En MAX_VAL (%0d): count=%0d | esperado=%0d",
+                 MAX_VAL, count_raw, bcd_at_max);
+        if (count_raw !== bcd_at_max) begin
+            $display("  [FAIL] Valor incorrecto en MAX_VAL");
             errors_test  = errors_test  + 1;
             errors_total = errors_total + 1;
         end
@@ -200,31 +186,31 @@ module tb_bcd_counter;
             $display("  carry=1 detectado en rollover: CORRECTO");
         en = 1'b0;
 
-        // Ciclo siguiente: carry=0 y bcd=0x00
+        // Ciclo siguiente: carry=0 y count=0
         @(posedge clk); #1;
-        check(8'h00, 1'b0, MAX_VAL);
-        $display("  Despues del rollover: bcd=0x%02h | carry=%b", bcd, carry);
+        check(6'd0, 1'b0, MAX_VAL);
+        $display("  Despues del rollover: count=%0d | carry=%b", count_raw, carry);
 
         if (errors_test == 0) $display("  Resultado: PASS");
         else                  $display("  Resultado: FAIL");
 
         // ------------------------------------------------------------------
-        // TEST 4: Enable gating — sin en=1 el contador no avanza
+        // TEST 4: Enable gating — sin clk_en=1 el contador no avanza
         // ------------------------------------------------------------------
         errors_test = 0;
-        $display("\n[TEST 4] Enable gating (en=0 no debe avanzar)");
+        $display("\n[TEST 4] Enable gating (clk_en=0 no debe avanzar)");
 
         rst = 1'b1; @(posedge clk); #1; rst = 1'b0;
         repeat(5) pulse_en;
-        $display("  bcd luego de 5 pulsos: 0x%02h", bcd);
+        $display("  count luego de 5 pulsos: %0d", count_raw);
 
         repeat(10) @(posedge clk); #1;
-        if (bcd !== 8'h05) begin
-            $display("  [FAIL] bcd cambio sin enable: 0x%02h (esperado 0x05)", bcd);
+        if (count_raw !== 6'd5) begin
+            $display("  [FAIL] count cambio sin enable: %0d (esperado 5)", count_raw);
             errors_test  = errors_test  + 1;
             errors_total = errors_total + 1;
         end else
-            $display("  bcd=0x05 tras 10 ciclos sin enable: CORRECTO");
+            $display("  count=5 tras 10 ciclos sin enable: CORRECTO");
 
         if (errors_test == 0) $display("  Resultado: PASS");
         else                  $display("  Resultado: FAIL");
@@ -238,7 +224,7 @@ module tb_bcd_counter;
             $display("  RESULTADO GLOBAL: TODOS LOS TESTS PASARON - OK");
         else
             $display("  RESULTADO GLOBAL: %0d ERROR(ES) - REVISAR", errors_total);
-        $display("  Para probar horas: cambiar MAX_VAL = 23 en linea 40");
+        $display("  Para probar horas: cambiar MAX_VAL = 23 en linea 27");
         $display("============================================================\n");
 
         $finish;
