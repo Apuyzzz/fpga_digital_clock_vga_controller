@@ -28,6 +28,9 @@ TB_NAMES=(
     "tb_debounce"
     "tb_div_freq"
     "tb_vga_controller"
+    "tb_fsm_adjust_mode"
+    "tb_binary_bcd_decoder"
+    "tb_hour_converter"
 )
 
 # --------------------------------------------------------------------------
@@ -38,6 +41,9 @@ declare -A TB_DEPS=(
     ["tb_debounce"]="sync_signal.v debounce.v bcd_counter.v"
     ["tb_div_freq"]="div_frec.v"
     ["tb_vga_controller"]="vga_controller.v"
+    ["tb_fsm_adjust_mode"]="fsm_adjust_mode.v"
+    ["tb_binary_bcd_decoder"]="binary_bcd_decoder.v"
+    ["tb_hour_converter"]="hour_converter.v"
 )
 
 PASS_COUNT=0
