@@ -1,5 +1,8 @@
 testbench,resultado,errores,tests_fallidos
 tb_bcd_counter,PASS,0,0
+tb_binary_bcd_decoder,PASS,0,0
 tb_debounce,PASS,0,0
 tb_div_freq,PASS,0,0
+tb_fsm_adjust_mode,PASS,0,0
+tb_hour_converter,PASS,0,0
 tb_vga_controller,PASS,0,0
