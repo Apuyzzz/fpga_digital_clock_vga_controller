@@ -34,9 +34,9 @@ module tb_div_freq;
     div_freq #(
         .DIVISOR(DIVISOR)
     ) DUT (
-        .clk  (clk),
-        .rst  (rst),
-        .tick (tick)
+        .clk_in (clk),
+        .rst    (rst),
+        .clk_out(tick)
     );
 
     // -------------------------------------------------------------------------
@@ -64,7 +64,7 @@ module tb_div_freq;
         // ------------------------------------------------------------------
         // TEST 1: Reset síncrono — tick debe ser 0 mientras rst=1
         // ------------------------------------------------------------------
-        $display("\n[TEST 1] Reset síncrono");
+        $display("\n[TEST 1] Reset sincrono");
         repeat(6) begin
             @(posedge clk); #1;
             if (tick !== 1'b0) begin
@@ -98,7 +98,7 @@ module tb_div_freq;
                          delta, DIVISOR * CLK_PERIOD);
                 errors = errors + 1;
             end else begin
-                $display("  Período entre ticks = %0d ns --> PASS", delta);
+                $display("  Periodo entre ticks = %0d ns --> PASS", delta);
             end
         end
 
@@ -126,22 +126,12 @@ module tb_div_freq;
         // TEST 4: Contar pulsos en un período conocido
         //         En DIVISOR*10 ciclos deben aparecer exactamente 10 ticks
         // ------------------------------------------------------------------
-        $display("\n[TEST 4] Número de ticks en %0d ciclos", DIVISOR * 10);
+        $display("\n[TEST 4] Numero de ticks en %0d ciclos", DIVISOR * 10);
         tick_cnt = 0;
-        fork
-            // Hilo 1: contar ticks durante DIVISOR*10 ciclos
-            begin
-                repeat(DIVISOR * 10) @(posedge clk);
-            end
-            // Hilo 2: contar ticks en paralelo
-            begin : count_ticks
-                forever begin
-                    @(posedge clk); #1;
-                    if (tick) tick_cnt = tick_cnt + 1;
-                end
-            end
-        join_any
-        disable count_ticks;
+        repeat(DIVISOR * 10) begin
+            @(posedge clk); #1;
+            if (tick) tick_cnt = tick_cnt + 1;
+        end
 
         $display("  Ticks contados = %0d | esperados = 10", tick_cnt);
         if (tick_cnt !== 10) begin
@@ -156,9 +146,9 @@ module tb_div_freq;
         // ------------------------------------------------------------------
         $display("\n============================================================");
         if (errors == 0)
-            $display("  RESULTADO FINAL: TODOS LOS TESTS PASARON ✓");
+            $display("  RESULTADO GLOBAL: TODOS LOS TESTS PASARON - OK");
         else
-            $display("  RESULTADO FINAL: %0d ERROR(ES) ENCONTRADO(S) ✗", errors);
+            $display("  RESULTADO GLOBAL: %0d ERROR(ES) - REVISAR", errors);
         $display("============================================================\n");
 
         $finish;
@@ -167,7 +157,7 @@ module tb_div_freq;
     // Timeout de seguridad
     initial begin
         #(CLK_PERIOD * 10000);
-        $display("[TIMEOUT] Simulación excedió el tiempo límite.");
+        $display("[TIMEOUT] Simulacion excedio el tiempo limite.");
         $finish;
     end
 
