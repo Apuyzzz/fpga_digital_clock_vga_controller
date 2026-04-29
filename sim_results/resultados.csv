@@ -1,0 +1,5 @@
+testbench,resultado,errores,tests_fallidos
+tb_bcd_counter,PASS,0,0
+tb_debounce,PASS,0,0
+tb_div_freq,PASS,0,0
+tb_vga_controller,PASS,0,0

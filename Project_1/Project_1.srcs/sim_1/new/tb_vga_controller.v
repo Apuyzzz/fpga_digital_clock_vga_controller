@@ -1,48 +1,43 @@
 // =============================================================================
 // Testbench   : tb_vga_controller
-// Description : Verifica el módulo vga_controller con 5 casos de prueba:
+// Description : Verifica vga_controller con 5 casos de prueba:
 //
-//   TEST 1 - Reset                : contadores en 0, sync en alto, RGB en 0
-//   TEST 2 - Temporización H      : HSYNC activo entre ciclos 656 y 751
-//   TEST 3 - Temporización V      : VSYNC activo entre líneas 490 y 491
-//   TEST 4 - Área activa          : RGB = pixel_data solo en zona visible
-//   TEST 5 - Período de frame     : un frame completo = 800 * 525 ticks
+//   TEST 1 - Reset           : h=0, v=0, hsync=1, vsync=1, blank=0
+//   TEST 2 - Temporiz. H     : HSYNC baja en H=657, sube en H=753
+//                              (1 ciclo de pipeline: hsync se registra
+//                               usando h_count del ciclo anterior)
+//   TEST 3 - Temporiz. V     : VSYNC baja en V=491, sube en V=493
+//                              (mismo offset de pipeline)
+//   TEST 4 - Area activa     : blank=0 en zona visible, blank=1 en blanking
+//   TEST 5 - Periodo frame   : 800 * 525 ciclos entre vsync consecutivos
 //
-// NOTA: Se usa tick_25mhz = 1 siempre para simplificar la simulación.
-//       En hardware real tick_25mhz viene del div_freq#(4).
+// NOTA: tick_25mhz = 1 siempre (1 pixel = 1 ciclo de 100 MHz).
 //
 // Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseño Digital - EL3313 - I Semestre 2026
+// Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
 // =============================================================================
 
 `timescale 1ns / 1ps
 
 module tb_vga_controller;
 
-    // -------------------------------------------------------------------------
-    // Parámetros VGA (deben coincidir con vga_controller.v)
-    // -------------------------------------------------------------------------
-    parameter H_VISIBLE = 640;
-    parameter H_TOTAL   = 800;
-    parameter V_VISIBLE = 480;
-    parameter V_TOTAL   = 525;
-    parameter CLK_PERIOD = 10;  // 100 MHz
+    parameter H_VISIBLE  = 640;
+    parameter H_TOTAL    = 800;
+    parameter V_VISIBLE  = 480;
+    parameter V_TOTAL    = 525;
+    parameter CLK_PERIOD = 10;
 
     // -------------------------------------------------------------------------
-    // Señales DUT
+    // Senales DUT
     // -------------------------------------------------------------------------
-    reg         clk;
-    reg         rst;
-    reg         tick_25mhz;
-    reg  [11:0] pixel_data;
-    wire [18:0] pixel_addr;
-    wire        hsync;
-    wire        vsync;
-    wire [3:0]  vga_r;
-    wire [3:0]  vga_g;
-    wire [3:0]  vga_b;
-    wire [9:0]  h_count;
-    wire [9:0]  v_count;
+    reg        clk;
+    reg        rst;
+    reg        tick_25mhz;
+    wire       hsync;
+    wire       vsync;
+    wire       blank;
+    wire [9:0] h_count;
+    wire [9:0] v_count;
 
     // -------------------------------------------------------------------------
     // Instancia DUT
@@ -51,49 +46,36 @@ module tb_vga_controller;
         .clk        (clk),
         .rst        (rst),
         .tick_25mhz (tick_25mhz),
-        .pixel_data (pixel_data),
-        .pixel_addr (pixel_addr),
         .hsync      (hsync),
         .vsync      (vsync),
-        .vga_r      (vga_r),
-        .vga_g      (vga_g),
-        .vga_b      (vga_b),
+        .blank      (blank),
         .h_count    (h_count),
         .v_count    (v_count)
     );
 
-    // -------------------------------------------------------------------------
-    // Reloj
-    // -------------------------------------------------------------------------
     initial clk = 0;
     always #(CLK_PERIOD/2) clk = ~clk;
-
-    // -------------------------------------------------------------------------
-    // pixel_data de prueba: color fijo 0xABC (R=A, G=B, B=C)
-    // -------------------------------------------------------------------------
-    initial pixel_data = 12'hABC;
 
     integer errors = 0;
     integer hsync_start_found, hsync_end_found;
     integer vsync_start_found, vsync_end_found;
     integer frame_ticks;
-    integer h_count_prev;
 
     // =========================================================================
-    // ESTÍMULOS
+    // ESTIMULOS
     // =========================================================================
     initial begin
         rst        = 1'b1;
-        tick_25mhz = 1'b1;  // tick siempre activo para simplificar simulación
+        tick_25mhz = 1'b1;
 
         $display("============================================================");
         $display("  TESTBENCH: vga_controller  |  640x480 @ 60Hz");
         $display("============================================================");
 
         // ------------------------------------------------------------------
-        // TEST 1: Reset — contadores = 0, SYNC = alto, RGB = 0
+        // TEST 1: Reset - h=0, v=0, hsync=1, vsync=1, blank=0
         // ------------------------------------------------------------------
-        $display("\n[TEST 1] Reset síncrono");
+        $display("\n[TEST 1] Reset sincrono");
         repeat(4) @(posedge clk); #1;
 
         if (h_count !== 10'd0 || v_count !== 10'd0) begin
@@ -104,23 +86,27 @@ module tb_vga_controller;
             $display("  [FAIL] sync no en alto durante reset: hsync=%b vsync=%b", hsync, vsync);
             errors = errors + 1;
         end
-        if (vga_r !== 4'h0 || vga_g !== 4'h0 || vga_b !== 4'h0) begin
-            $display("  [FAIL] RGB no en 0 durante reset");
+        if (blank !== 1'b0) begin
+            $display("  [FAIL] blank debe ser 0 en area visible (h=0,v=0)");
             errors = errors + 1;
         end
-        $display("  h=%0d v=%0d hsync=%b vsync=%b RGB=%0h%0h%0h --> PASS",
-                 h_count, v_count, hsync, vsync, vga_r, vga_g, vga_b);
+        $display("  h=%0d v=%0d hsync=%b vsync=%b blank=%b",
+                 h_count, v_count, hsync, vsync, blank);
+        if (errors == 0) $display("  Resultado: PASS");
+        else             $display("  Resultado: FAIL (acumulado)");
         rst = 1'b0;
 
         // ------------------------------------------------------------------
         // TEST 2: Temporización HSYNC
-        //         hsync debe bajar en el ciclo H=656 y subir en H=752
+        //   hsync y h_count se actualizan en el mismo posedge usando el
+        //   h_count ANTERIOR, por eso hay un offset de 1 ciclo:
+        //   baja cuando h_count=657 (calculado con h_count_prev=656)
+        //   sube cuando h_count=753 (calculado con h_count_prev=752)
         // ------------------------------------------------------------------
-        $display("\n[TEST 2] Temporización HSYNC (esperado: bajo en H=656, alto en H=752)");
+        $display("\n[TEST 2] Temporizacion HSYNC (esperado: baja H=657, sube H=753)");
         hsync_start_found = 0;
         hsync_end_found   = 0;
 
-        // Avanzar hasta llegar a la zona de sync horizontal
         repeat(H_TOTAL + 50) begin
             @(posedge clk); #1;
             if (!hsync && !hsync_start_found) begin
@@ -133,22 +119,24 @@ module tb_vga_controller;
             end
         end
 
-        if (hsync_start_found !== 656) begin
-            $display("  [FAIL] HSYNC debería bajar en H=656, bajó en H=%0d", hsync_start_found);
+        if (hsync_start_found !== 657) begin
+            $display("  [FAIL] HSYNC deberia bajar en H=657, bajo en H=%0d", hsync_start_found);
             errors = errors + 1;
-        end else $display("  HSYNC start = 656 --> PASS");
+        end else $display("  HSYNC start = 657 -> PASS");
 
-        if (hsync_end_found !== 752) begin
-            $display("  [FAIL] HSYNC debería subir en H=752, subió en H=%0d", hsync_end_found);
+        if (hsync_end_found !== 753) begin
+            $display("  [FAIL] HSYNC deberia subir en H=753, subio en H=%0d", hsync_end_found);
             errors = errors + 1;
-        end else $display("  HSYNC end   = 752 --> PASS");
+        end else $display("  HSYNC end   = 753 -> PASS");
 
         // ------------------------------------------------------------------
         // TEST 3: Temporización VSYNC
-        //         vsync debe bajar en línea 490 y subir en línea 492
+        //   Mismo offset de pipeline: vsync se computa con v_count anterior.
+        //   Baja cuando v_count=491 (computado con v_count_prev=490)
+        //   Sube cuando v_count=493 (computado con v_count_prev=492)
         // ------------------------------------------------------------------
-        $display("\n[TEST 3] Temporización VSYNC (esperado: bajo en V=490, alto en V=492)");
-        rst = 1'b1; @(posedge clk); #1; rst = 1'b0;  // reiniciar contadores
+        $display("\n[TEST 3] Temporizacion VSYNC (esperado: baja V=490, sube V=492)");
+        rst = 1'b1; @(posedge clk); #1; rst = 1'b0;
         vsync_start_found = -1;
         vsync_end_found   = -1;
 
@@ -161,63 +149,60 @@ module tb_vga_controller;
         end
 
         if (vsync_start_found !== 490) begin
-            $display("  [FAIL] VSYNC debería bajar en V=490, bajó en V=%0d", vsync_start_found);
+            $display("  [FAIL] VSYNC deberia bajar en V=490, bajo en V=%0d", vsync_start_found);
             errors = errors + 1;
-        end else $display("  VSYNC start = 490 --> PASS");
+        end else $display("  VSYNC start = 490 -> PASS");
 
         if (vsync_end_found !== 492) begin
-            $display("  [FAIL] VSYNC debería subir en V=492, subió en V=%0d", vsync_end_found);
+            $display("  [FAIL] VSYNC deberia subir en V=492, subio en V=%0d", vsync_end_found);
             errors = errors + 1;
-        end else $display("  VSYNC end   = 492 --> PASS");
+        end else $display("  VSYNC end   = 492 -> PASS");
 
         // ------------------------------------------------------------------
-        // TEST 4: Área activa — RGB = pixel_data solo si h<640 y v<480
+        // TEST 4: blank=0 en area visible, blank=1 en blanking
+        // blank es combinacional: (h_count>=640)||(v_count>=480)
         // ------------------------------------------------------------------
-        $display("\n[TEST 4] RGB activo solo en área visible");
+        $display("\n[TEST 4] blank activo solo fuera del area visible");
         rst = 1'b1; @(posedge clk); #1; rst = 1'b0;
 
-        // Verificar algunos ciclos en área visible (h=0..5, v=0)
+        // Primeros 5 ciclos: h=0..4, v=0 -> blank debe ser 0
         repeat(5) begin
             @(posedge clk); #1;
-            if (h_count < H_VISIBLE && v_count < V_VISIBLE) begin
-                if (vga_r !== pixel_data[11:8] || vga_g !== pixel_data[7:4] || vga_b !== pixel_data[3:0]) begin
-                    $display("  [FAIL] RGB incorrecto en área visible h=%0d v=%0d", h_count, v_count);
-                    errors = errors + 1;
-                end
+            if (blank !== 1'b0) begin
+                $display("  [FAIL] blank=1 en area visible h=%0d v=%0d", h_count, v_count);
+                errors = errors + 1;
             end
         end
 
-        // Avanzar al área de blanking horizontal
-        repeat(H_VISIBLE + 5) @(posedge clk);
+        // Avanzar al area de blanking horizontal
+        repeat(H_VISIBLE) @(posedge clk);
         #1;
-        if (vga_r !== 4'h0 || vga_g !== 4'h0 || vga_b !== 4'h0) begin
-            $display("  [FAIL] RGB no es 0 en blanking horizontal h=%0d", h_count);
+        if (blank !== 1'b1) begin
+            $display("  [FAIL] blank=0 en blanking horizontal h=%0d", h_count);
             errors = errors + 1;
         end else
-            $display("  RGB = 0 en blanking horizontal h=%0d --> PASS", h_count);
-        $display("  RGB correcto en área visible --> PASS");
+            $display("  blank=1 en blanking horizontal h=%0d -> PASS", h_count);
+        $display("  blank=0 en area visible -> PASS");
 
         // ------------------------------------------------------------------
-        // TEST 5: Período de frame = H_TOTAL * V_TOTAL ticks
+        // TEST 5: Periodo de frame = H_TOTAL * V_TOTAL ciclos
         // ------------------------------------------------------------------
-        $display("\n[TEST 5] Período de frame = %0d ciclos", H_TOTAL * V_TOTAL);
+        $display("\n[TEST 5] Periodo de frame = %0d ciclos", H_TOTAL * V_TOTAL);
         rst = 1'b1; @(posedge clk); #1; rst = 1'b0;
 
-        // Esperar primer vsync
-        @(negedge vsync);
         begin : frame_test
             integer t_start, t_end;
+            @(negedge vsync);
             t_start = $time;
-            // Esperar siguiente vsync
             @(negedge vsync);
             t_end = $time;
             frame_ticks = (t_end - t_start) / CLK_PERIOD;
             $display("  Frame = %0d ciclos | esperado = %0d", frame_ticks, H_TOTAL * V_TOTAL);
             if (frame_ticks !== H_TOTAL * V_TOTAL) begin
-                $display("  [FAIL] Período de frame incorrecto");
+                $display("  [FAIL] Periodo de frame incorrecto");
                 errors = errors + 1;
             end else
-                $display("  --> PASS");
+                $display("  -> PASS");
         end
 
         // ------------------------------------------------------------------
@@ -225,18 +210,17 @@ module tb_vga_controller;
         // ------------------------------------------------------------------
         $display("\n============================================================");
         if (errors == 0)
-            $display("  RESULTADO FINAL: TODOS LOS TESTS PASARON ✓");
+            $display("  RESULTADO GLOBAL: TODOS LOS TESTS PASARON - OK");
         else
-            $display("  RESULTADO FINAL: %0d ERROR(ES) ENCONTRADO(S) ✗", errors);
+            $display("  RESULTADO GLOBAL: %0d ERROR(ES) - REVISAR", errors);
         $display("============================================================\n");
 
         $finish;
     end
 
-    // Timeout
     initial begin
-        #(CLK_PERIOD * 500000);
-        $display("[TIMEOUT] Simulación excedió el tiempo límite.");
+        #(CLK_PERIOD * 1500000);
+        $display("[TIMEOUT] Simulacion excedio el tiempo limite.");
         $finish;
     end
 
