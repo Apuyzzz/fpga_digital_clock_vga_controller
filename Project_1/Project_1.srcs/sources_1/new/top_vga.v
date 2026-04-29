@@ -4,8 +4,11 @@
 //               Controller on Nexys A7-100T. Single 100 MHz clock domain with
 //               pixel-clock and 1 Hz clock-enables (no CDC required).
 //               VGA timing: 640x480 @ 60 Hz (25 MHz pixel clock enable).
-//               BRAM read has 1-cycle latency → blank/hsync/vsync delayed 1
-//               cycle to keep VGA sync aligned with pixel data.
+//
+//               Pixels are rendered combinationally (text_renderer + bg_generator
+//               are purely combinational), registered once, and output directly —
+//               no BRAM framebuffer needed. The 1-cycle register matches the
+//               sync signal delay already present in the VGA controller.
 //
 //   Controls:
 //     BTNC  — cycle adjust mode: RUN → ADJ_HOUR → ADJ_MIN → RUN
@@ -218,7 +221,7 @@ module top_vga (
         .v_count   (v_count)
     );
 
-    // 1-cycle delay on sync signals to match BRAM read latency
+    // 1-cycle delay on sync signals to align with the registered pixel pipeline
     reg hsync_d, vsync_d, blank_d;
     always @(posedge CLK100MHZ) begin
         hsync_d <= hsync_raw;
@@ -230,36 +233,27 @@ module top_vga (
     assign VGA_VS = vsync_d;
 
     // =========================================================================
-    // 9. VRAM (dual-port BRAM)
+    // 9. Background generator + Text renderer (combinational, scan-time)
+    //
+    //    Both modules are purely combinational: pixel color is computed
+    //    directly from h_count/v_count each clock cycle with no BRAM needed.
+    //    A single register stage aligns the pixel data with the 1-cycle
+    //    delayed sync signals produced by the VGA controller.
     // =========================================================================
 
-    wire [18:0] bram_addr_r = v_count * 10'd640 + h_count;
-    wire [11:0] bram_dout;
-    wire [18:0] bram_addr_w;
-    wire [11:0] bram_din_w;
-    wire        bram_we_w;
-
-    bram_dualport #(.DATA_WIDTH(12), .ADDR_WIDTH(19)) u_bram (
-        .clk_a(CLK100MHZ), .addr_a(bram_addr_r), .dout_a(bram_dout),
-        .clk_b(CLK100MHZ), .addr_b(bram_addr_w), .din_b(bram_din_w),
-        .we_b(bram_we_w)
-    );
-
-    // =========================================================================
-    // 10. Background generator + Text renderer (combinational)
-    // =========================================================================
-
-    wire [9:0]  h_wr, v_wr;
     wire [11:0] bg_color;
     wire        pixel_on;
     wire [11:0] text_color_w;
 
     bg_generator u_bg (
-        .h_count(h_wr), .v_count(v_wr), .bg_color(bg_color));
+        .h_count(h_count),
+        .v_count(v_count),
+        .bg_color(bg_color)
+    );
 
     text_renderer u_text (
-        .h_count   (h_wr),
-        .v_count   (v_wr),
+        .h_count   (h_count),
+        .v_count   (v_count),
         .hour_tens (disp_hour_tens),
         .hour_ones (disp_hour_ones),
         .min_tens  (min_tens),
@@ -275,57 +269,30 @@ module top_vga (
         .text_color(text_color_w)
     );
 
-    // =========================================================================
-    // 11. VRAM writer
-    // =========================================================================
-
-    reg rst_d;
-    always @(posedge CLK100MHZ) rst_d <= rst;
-    wire boot_req = rst_d & ~rst;
-
-    // Trigger redraw on any switch change (so 12h/24h toggle is instant)
-    reg [15:0] sw_prev;
-    always @(posedge CLK100MHZ) sw_prev <= sw_sync;
-    wire sw_changed = (sw_sync != sw_prev);
-
-    wire redraw_req = tick_1hz | btn_mode_db | btn_up_db | btn_down_db
-                    | btn_ajuste_db | boot_req | sw_changed;
-
-    wire drawing;
-
-    vram_writer u_writer (
-        .clk       (CLK100MHZ),
-        .rst       (rst),
-        .redraw_req(redraw_req),
-        .h_wr      (h_wr),
-        .v_wr      (v_wr),
-        .bg_color  (bg_color),
-        .pixel_on  (pixel_on),
-        .text_color(text_color_w),
-        .bram_addr (bram_addr_w),
-        .bram_din  (bram_din_w),
-        .bram_we   (bram_we_w),
-        .drawing   (drawing)
-    );
+    // Merge combinational outputs and register once (1-cycle pipeline stage)
+    wire [11:0] pixel_comb = pixel_on ? text_color_w : bg_color;
+    reg  [11:0] pixel_reg;
+    always @(posedge CLK100MHZ)
+        pixel_reg <= pixel_comb;
 
     // =========================================================================
-    // 12. Pixel output mux
+    // 10. Pixel output mux
     // =========================================================================
 
     pixel_mux u_pmux (
         .blank     (blank_d),
-        .pixel_data(bram_dout),
+        .pixel_data(pixel_reg),
         .vga_r     (VGA_R),
         .vga_g     (VGA_G),
         .vga_b     (VGA_B)
     );
 
     // =========================================================================
-    // 13. LED indicators
+    // 11. LED indicators
     // =========================================================================
 
     assign LED[1:0]  = mode_leds;        // 00=RUN, 01=ADJ_HOUR, 10=ADJ_MIN
-    assign LED[2]    = drawing;          // VRAM redraw in progress
+    assign LED[2]    = 1'b0;             // unused (was VRAM redraw indicator)
     assign LED[3]    = mode_12h;         // 12h mode active
     assign LED[4]    = is_pm;            // PM indicator
     assign LED[15:5] = sw_sync[15:5];   // mirror unused switches
