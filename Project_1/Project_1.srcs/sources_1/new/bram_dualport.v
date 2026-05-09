@@ -1,45 +1,33 @@
-// -----------------------------------------------------------------------------
-// Module      : bram_dualport
-// Description : True Dual-Port Block RAM inferred for Xilinx Artix-7.
-//               Port A is read-only (VGA pixel fetch).
-//               Port B is write-only (vram_writer pixel store).
-//               Vivado infers this as RAMB36E1/RAMB18E1 primitives.
-//               Capacity: 2^ADDR_WIDTH words of DATA_WIDTH bits each.
-//               For 640x480: DATA_WIDTH=12, ADDR_WIDTH=19 (512K > 307200).
-// Author      : JustinAlfaro
-// Date        : 2026-04-21
-// Parameters:
-//   DATA_WIDTH - Bits per pixel (default 12 for 4-4-4 RGB)
-//   ADDR_WIDTH - Address bits   (default 19 → 524288 locations)
-// -----------------------------------------------------------------------------
-// Port A (read):
-//   clk_a   - Clock for port A
-//   addr_a  - Read address [ADDR_WIDTH-1:0]
-//   dout_a  - Read data output [DATA_WIDTH-1:0]
-// Port B (write):
-//   clk_b   - Clock for port B
-//   addr_b  - Write address [ADDR_WIDTH-1:0]
-//   din_b   - Write data input [DATA_WIDTH-1:0]
-//   we_b    - Write enable
-// -----------------------------------------------------------------------------
+/**
+ * @title BRAM de doble puerto (VRAM)
+ * @file bram_dualport.v
+ * @brief Memoria de video (VRAM) de doble puerto inferida como BRAM en Xilinx Artix-7.
+ * @details
+ *   Puerto A: solo lectura (controlador VGA fetch de píxeles).
+ *   Puerto B: solo escritura (vram_writer actualiza el frame).
+ *   Vivado infiere primitivas RAMB36E1/RAMB18E1.
+ *   DEPTH=307200 (exactamente 640×480) evita la sobre-asignación de 2^19=524K
+ *   entradas que causaba el DRC UTLZ-1 al exceder los 4.86 Mbit disponibles.
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-21
+ */
 
 `timescale 1ns / 1ps
 
 module bram_dualport #(
-    parameter integer DATA_WIDTH = 12,
-    parameter integer ADDR_WIDTH = 19,
-    parameter integer DEPTH      = 307200  // exact 640x480 — avoids 2^19=524K over-allocation
+    parameter integer DATA_WIDTH = 12,    ///< Bits por píxel (12 para RGB 4-4-4)
+    parameter integer ADDR_WIDTH = 19,    ///< Bits de dirección (19 bits cubre hasta 524K)
+    parameter integer DEPTH      = 307200 ///< Profundidad real: 640×480 píxeles
 )(
-    // Port A — read
-    input  wire                  clk_a,
-    input  wire [ADDR_WIDTH-1:0] addr_a,
-    output reg  [DATA_WIDTH-1:0] dout_a,
+    input  wire                  clk_a,  ///< Reloj del puerto A (lectura VGA)
+    input  wire [ADDR_WIDTH-1:0] addr_a, ///< Dirección de lectura
+    output reg  [DATA_WIDTH-1:0] dout_a, ///< Dato leído (píxel RGB)
 
-    // Port B — write
-    input  wire                  clk_b,
-    input  wire [ADDR_WIDTH-1:0] addr_b,
-    input  wire [DATA_WIDTH-1:0] din_b,
-    input  wire                  we_b
+    input  wire                  clk_b,  ///< Reloj del puerto B (escritura vram_writer)
+    input  wire [ADDR_WIDTH-1:0] addr_b, ///< Dirección de escritura
+    input  wire [DATA_WIDTH-1:0] din_b,  ///< Dato a escribir (píxel RGB)
+    input  wire                  we_b    ///< Habilitación de escritura
 );
 
     // RAM array — Vivado infers BRAM when (* ram_style = "block" *) is set
