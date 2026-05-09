@@ -233,28 +233,36 @@ module top_vga (
     assign VGA_VS = vsync_d;
 
     // =========================================================================
-    // 9. Background ROM + Text renderer
-    //
-    //    bg_rom is a synchronous BRAM ROM (1-cycle read latency).
-    //    text_renderer is combinational; its outputs are registered 1 cycle
-    //    to match the ROM latency. bg_color, pixel_on_d, text_color_d and
-    //    blank_d/hsync_d/vsync_d are all 1-cycle delayed → aligned.
+    // 9. VRAM (dual-port BRAM)
     // =========================================================================
 
+    wire [18:0] bram_addr_r = v_count * 10'd640 + h_count;
+    wire [11:0] bram_dout;
+    wire [18:0] bram_addr_w;
+    wire [11:0] bram_din_w;
+    wire        bram_we_w;
+
+    bram_dualport #(.DATA_WIDTH(12), .ADDR_WIDTH(19), .DEPTH(307200)) u_bram (
+        .clk_a(CLK100MHZ), .addr_a(bram_addr_r), .dout_a(bram_dout),
+        .clk_b(CLK100MHZ), .addr_b(bram_addr_w), .din_b(bram_din_w),
+        .we_b(bram_we_w)
+    );
+
+    // =========================================================================
+    // 10. Background generator + Text renderer (combinational)
+    // =========================================================================
+
+    wire [9:0]  h_wr, v_wr;
     wire [11:0] bg_color;
     wire        pixel_on;
     wire [11:0] text_color_w;
 
-    bg_rom u_bg (
-        .clk    (CLK100MHZ),
-        .h_count(h_count),
-        .v_count(v_count),
-        .bg_color(bg_color)
-    );
+    bg_generator u_bg (
+        .h_count(h_wr), .v_count(v_wr), .bg_color(bg_color));
 
     text_renderer u_text (
-        .h_count   (h_count),
-        .v_count   (v_count),
+        .h_count   (h_wr),
+        .v_count   (v_wr),
         .hour_tens (disp_hour_tens),
         .hour_ones (disp_hour_ones),
         .min_tens  (min_tens),
@@ -270,34 +278,56 @@ module top_vga (
         .text_color(text_color_w)
     );
 
-    // Delay text outputs 1 cycle to match bg_rom synchronous read latency
-    reg        pixel_on_d;
-    reg [11:0] text_color_d;
-    always @(posedge CLK100MHZ) begin
-        pixel_on_d   <= pixel_on;
-        text_color_d <= text_color_w;
-    end
+    // =========================================================================
+    // 11. VRAM writer
+    // =========================================================================
 
-    wire [11:0] pixel_reg = pixel_on_d ? text_color_d : bg_color;
+    reg rst_d;
+    always @(posedge CLK100MHZ) rst_d <= rst;
+    wire boot_req = rst_d & ~rst;
+
+    reg [15:0] sw_prev;
+    always @(posedge CLK100MHZ) sw_prev <= sw_sync;
+    wire sw_changed = (sw_sync != sw_prev);
+
+    wire redraw_req = tick_1hz | btn_mode_db | btn_up_db | btn_down_db
+                    | btn_ajuste_db | boot_req | sw_changed;
+
+    wire drawing;
+
+    vram_writer u_writer (
+        .clk       (CLK100MHZ),
+        .rst       (rst),
+        .redraw_req(redraw_req),
+        .h_wr      (h_wr),
+        .v_wr      (v_wr),
+        .bg_color  (bg_color),
+        .pixel_on  (pixel_on),
+        .text_color(text_color_w),
+        .bram_addr (bram_addr_w),
+        .bram_din  (bram_din_w),
+        .bram_we   (bram_we_w),
+        .drawing   (drawing)
+    );
 
     // =========================================================================
-    // 10. Pixel output mux
+    // 12. Pixel output mux
     // =========================================================================
 
     pixel_mux u_pmux (
         .blank     (blank_d),
-        .pixel_data(pixel_reg),
+        .pixel_data(bram_dout),
         .vga_r     (VGA_R),
         .vga_g     (VGA_G),
         .vga_b     (VGA_B)
     );
 
     // =========================================================================
-    // 11. LED indicators
+    // 13. LED indicators
     // =========================================================================
 
     assign LED[1:0]  = mode_leds;        // 00=RUN, 01=ADJ_HOUR, 10=ADJ_MIN
-    assign LED[2]    = 1'b0;             // unused (was VRAM redraw indicator)
+    assign LED[2]    = drawing;          // VRAM redraw in progress
     assign LED[3]    = mode_12h;         // 12h mode active
     assign LED[4]    = is_pm;            // PM indicator
     assign LED[15:5] = sw_sync[15:5];   // mirror unused switches

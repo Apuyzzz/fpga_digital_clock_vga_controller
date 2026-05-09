@@ -27,7 +27,8 @@
 
 module bram_dualport #(
     parameter integer DATA_WIDTH = 12,
-    parameter integer ADDR_WIDTH = 19
+    parameter integer ADDR_WIDTH = 19,
+    parameter integer DEPTH      = 307200  // exact 640x480 — avoids 2^19=524K over-allocation
 )(
     // Port A — read
     input  wire                  clk_a,
@@ -43,12 +44,12 @@ module bram_dualport #(
 
     // RAM array — Vivado infers BRAM when (* ram_style = "block" *) is set
     (* ram_style = "block" *)
-    reg [DATA_WIDTH-1:0] mem [0:(1<<ADDR_WIDTH)-1];
+    reg [DATA_WIDTH-1:0] mem [0:DEPTH-1];
 
     // Initialize VRAM to black at bitstream load time
     integer i;
     initial begin
-        for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1)
+        for (i = 0; i < DEPTH; i = i + 1)
             mem[i] = {DATA_WIDTH{1'b0}};
     end
 
