@@ -1,51 +1,37 @@
-// -----------------------------------------------------------------------------
-// Module      : vram_writer
-// Description : Sequential FSM that redraws the entire 640x480 VRAM once per
-//               redraw request. Runs at 100 MHz; a full frame takes 307 200
-//               cycles (~3.07 ms, well within the 1-second update window).
-//
-//               bg_color comes from bg_rom (synchronous, 1-cycle latency from
-//               h_wr/v_wr). A 1-cycle internal pipeline compensates: Stage 1
-//               latches the pixel's address and text data while bg_rom reads;
-//               Stage 2 commits to BRAM once bg_color is valid.
-//
-// Author      : JustinAlfaro
-// Date        : 2026-04-21
-// -----------------------------------------------------------------------------
-// Ports:
-//   clk          - 100 MHz system clock
-//   rst          - Synchronous active-high reset
-//   redraw_req   - Pulse: triggers a full-frame redraw
-//   h_wr         - Current write column [9:0] → bg_rom + text_renderer
-//   v_wr         - Current write row    [9:0] → bg_rom + text_renderer
-//   bg_color     - 12-bit background from bg_rom (valid 1 cycle after h_wr/v_wr)
-//   pixel_on     - 1 if current pixel is a character foreground (combinational)
-//   text_color   - 12-bit text color from text_renderer (combinational)
-//   bram_addr    - Write address to BRAM port B [18:0]
-//   bram_din     - Write data to BRAM port B [11:0]
-//   bram_we      - Write enable for BRAM port B
-//   drawing      - High while a redraw is in progress
-// -----------------------------------------------------------------------------
+/**
+ * @title Escritor de VRAM
+ * @file vram_writer.v
+ * @brief FSM secuencial que redibuja el frame completo de 640×480 en la VRAM ante cada solicitud.
+ * @details
+ *   Opera a 100 MHz; un frame completo toma 307 200 ciclos (~3.07 ms).
+ *   bg_color proviene de bg_rom (latencia sincrónica de 1 ciclo desde h_wr/v_wr).
+ *   Se implementa un pipeline interno de 1 ciclo para compensar esta latencia:
+ *   - Etapa 1: captura dirección y datos de texto mientras bg_rom realiza la lectura.
+ *   - Etapa 2: escribe a BRAM cuando bg_color ya es válido para ese píxel.
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-21
+ */
 
 `timescale 1ns / 1ps
 
 module vram_writer (
-    input  wire        clk,
-    input  wire        rst,
-    input  wire        redraw_req,
+    input  wire        clk,        ///< Reloj del sistema (100 MHz)
+    input  wire        rst,        ///< Reset síncrono activo alto
+    input  wire        redraw_req, ///< Pulso que dispara un redibujado completo del frame
 
-    output reg  [9:0]  h_wr,
-    output reg  [9:0]  v_wr,
+    output reg  [9:0]  h_wr,       ///< Columna actual de escritura [9:0] → bg_rom y text_renderer
+    output reg  [9:0]  v_wr,       ///< Fila actual de escritura [9:0] → bg_rom y text_renderer
 
-    input  wire [11:0] bg_color,
-    input  wire        pixel_on,
-    input  wire [11:0] text_color,
+    input  wire [11:0] bg_color,   ///< Color de fondo desde bg_rom (válido 1 ciclo después de h/v_wr)
+    input  wire        pixel_on,   ///< Alto si el píxel actual es foreground de texto (combinacional)
+    input  wire [11:0] text_color, ///< Color de texto desde text_renderer (combinacional)
 
-    output reg  [18:0] bram_addr,
-    output reg  [11:0] bram_din,
-    output reg         bram_we,
+    output reg  [18:0] bram_addr,  ///< Dirección de escritura al puerto B de BRAM
+    output reg  [11:0] bram_din,   ///< Dato a escribir al puerto B de BRAM (píxel RGB)
+    output reg         bram_we,    ///< Habilitación de escritura al puerto B de BRAM
 
-    output reg         drawing
+    output reg         drawing     ///< Alto mientras un redibujado está en progreso
 );
 
     localparam [1:0] IDLE = 2'd0, DRAW = 2'd1, DONE = 2'd2;

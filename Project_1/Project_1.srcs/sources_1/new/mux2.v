@@ -1,25 +1,21 @@
-// -----------------------------------------------------------------------------
-// Module      : mux2
-// Description : Generic parametric 2-to-1 multiplexer. Combinational, zero
-//               latency. WIDTH=1 gives a single-bit mux; any width supported.
-// Author      : JustinAlfaro
-// Date        : 2026-04-22
-// Parameters:
-//   WIDTH - Data path width in bits (default 1)
-// Ports:
-//   d0  - Input selected when sel=0
-//   d1  - Input selected when sel=1
-//   sel - Select signal
-//   y   - Output
-// -----------------------------------------------------------------------------
+/**
+ * @title Multiplexor 2:1 paramétrico
+ * @file mux2.v
+ * @brief Multiplexor genérico de 2 entradas y WIDTH bits. Combinacional, latencia cero.
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-22
+ */
 
 `timescale 1ns / 1ps
 
-module mux2 #(parameter integer WIDTH = 1) (
-    input  wire [WIDTH-1:0] d0,
-    input  wire [WIDTH-1:0] d1,
-    input  wire             sel,
-    output wire [WIDTH-1:0] y
+module mux2 #(
+    parameter integer WIDTH = 1  ///< Ancho del bus de datos en bits
+)(
+    input  wire [WIDTH-1:0] d0,  ///< Entrada seleccionada cuando sel=0
+    input  wire [WIDTH-1:0] d1,  ///< Entrada seleccionada cuando sel=1
+    input  wire             sel, ///< Señal de selección
+    output wire [WIDTH-1:0] y    ///< Salida
 );
     assign y = sel ? d1 : d0;
 endmodule

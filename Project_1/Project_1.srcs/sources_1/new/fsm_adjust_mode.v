@@ -1,49 +1,35 @@
-// -----------------------------------------------------------------------------
-// Module      : fsm_adjust_mode
-// Description : Moore FSM controlling the clock adjustment mode.
-//               States: RUN (normal), ADJ_HOUR, ADJ_MIN.
-//               btn_mode cycles RUN→ADJ_HOUR→ADJ_MIN→RUN.
-//               btn_ajuste (accept) immediately returns to RUN from any state.
-//               BTNU/BTND increment/decrement the selected field.
-//               Seconds reset to 0 on any state transition.
-// Author      : JustinAlfaro
-// Date        : 2026-04-22
-// Ports:
-//   clk        - System clock (100 MHz)
-//   rst        - Synchronous active-high reset
-//   btn_mode   - Debounced BTNC pulse (cycle state)
-//   btn_up     - Debounced BTNU pulse (increment)
-//   btn_down   - Debounced BTND pulse (decrement)
-//   btn_ajuste - Debounced BTNR pulse (accept, return to RUN)
-//   adj_hour   - High in ADJ_HOUR state
-//   adj_min    - High in ADJ_MIN  state
-//   sec_en     - Seconds auto-increment enable (only in RUN)
-//   hour_inc   - Increment hours pulse
-//   hour_dec   - Decrement hours pulse
-//   min_inc    - Increment minutes pulse
-//   min_dec    - Decrement minutes pulse
-//   sec_rst    - Reset seconds on state transition
-//   mode_leds  - 2-bit LED indicator: 00=RUN, 01=ADJ_HOUR, 10=ADJ_MIN
-// -----------------------------------------------------------------------------
+/**
+ * @title FSM de modo de ajuste del reloj
+ * @file fsm_adjust_mode.v
+ * @brief FSM de Moore que controla el modo de ajuste de hora y minutos.
+ * @details
+ *   Estados: RUN (operación normal), ADJ_HOUR (ajuste de horas), ADJ_MIN (ajuste de minutos).
+ *   btn_mode cicla RUN→ADJ_HOUR→ADJ_MIN→RUN.
+ *   btn_ajuste retorna inmediatamente a RUN desde cualquier estado.
+ *   Los segundos se resetean a 0 en cada transición de estado.
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-22
+ */
 
 `timescale 1ns / 1ps
 
 module fsm_adjust_mode (
-    input  wire       clk,
-    input  wire       rst,
-    input  wire       btn_mode,
-    input  wire       btn_up,
-    input  wire       btn_down,
-    input  wire       btn_ajuste,
-    output reg        adj_hour,
-    output reg        adj_min,
-    output reg        sec_en,
-    output reg        hour_inc,
-    output reg        hour_dec,
-    output reg        min_inc,
-    output reg        min_dec,
-    output reg        sec_rst,
-    output reg  [1:0] mode_leds
+    input  wire       clk,        ///< Reloj del sistema (100 MHz)
+    input  wire       rst,        ///< Reset síncrono activo alto
+    input  wire       btn_mode,   ///< Pulso debounced de BTNC (cicla estado)
+    input  wire       btn_up,     ///< Pulso debounced de BTNU (incrementa campo)
+    input  wire       btn_down,   ///< Pulso debounced de BTND (decrementa campo)
+    input  wire       btn_ajuste, ///< Pulso debounced de BTNR (acepta y vuelve a RUN)
+    output reg        adj_hour,   ///< Alto en estado ADJ_HOUR
+    output reg        adj_min,    ///< Alto en estado ADJ_MIN
+    output reg        sec_en,     ///< Habilita auto-incremento de segundos (solo en RUN)
+    output reg        hour_inc,   ///< Pulso de incremento de horas
+    output reg        hour_dec,   ///< Pulso de decremento de horas
+    output reg        min_inc,    ///< Pulso de incremento de minutos
+    output reg        min_dec,    ///< Pulso de decremento de minutos
+    output reg        sec_rst,    ///< Resetea segundos al cambiar de estado
+    output reg  [1:0] mode_leds   ///< Indicador LED: 00=RUN, 01=ADJ_HOUR, 10=ADJ_MIN
 );
 
     localparam [1:0]

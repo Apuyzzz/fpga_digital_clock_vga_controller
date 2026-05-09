@@ -1,39 +1,31 @@
-// -----------------------------------------------------------------------------
-// Module      : bg_rom
-// Description : Synchronous BRAM ROM storing the 160x120 pixel-art night-sky
-//               background image in RGB 4-4-4 (12-bit) format.
-//
-//   Scale : 4x (each ROM pixel maps to a 4x4 block on the 640x480 display)
-//   Address: {v_count[8:2], h_count[9:2]}  — pure bit extraction, no maths
-//             v_count[8:2] = row  (0-119, 7 bits)
-//             h_count[9:2] = col  (0-159, 8 bits)
-//             → 15-bit address, 32768-entry ROM (256 cols × 128 rows)
-//
-//   Entries outside the 160x120 image area (col>=160 or row>=120) are 12'h000
-//   and are never accessed during active video (blank signal masks those pixels).
-//
-//   Read latency : 1 clock cycle (BRAM synchronous output register).
-//   top_vga delays text_renderer outputs by the same 1 cycle so all pixel
-//   data stays aligned with the VGA sync signals.
-//
-// Author      : JustinAlfaro
-// Date        : 2026-05-08
-// -----------------------------------------------------------------------------
-// Ports:
-//   clk      - 100 MHz system clock
-//   h_count  - Horizontal pixel coordinate [9:0] (from vga_controller)
-//   v_count  - Vertical pixel coordinate [9:0]   (from vga_controller)
-//   bg_color - Output background color [11:0] = {R[3:0], G[3:0], B[3:0]}
-//              Valid 1 clock cycle after h_count/v_count change.
-// -----------------------------------------------------------------------------
+/**
+ * @title ROM de fondo — Pixel art noche estrellada
+ * @file bg_rom.v
+ * @brief ROM BRAM sincrónica que almacena la imagen de fondo pixel art (160×120 px, escala 4×).
+ * @details
+ *   Cada píxel de la ROM corresponde a un bloque de 4×4 píxeles en pantalla (640×480).
+ *   Direccionamiento: {v_count[8:2], h_count[9:2]} — extracción pura de bits, sin aritmética.
+ *     - v_count[8:2] = fila  (0-119, 7 bits)
+ *     - h_count[9:2] = columna (0-159, 8 bits)
+ *     → dirección de 15 bits, ROM de 32768 entradas (256 cols × 128 filas)
+ *
+ *   Entradas fuera del área 160×120 contienen 12'h000 y nunca se acceden
+ *   durante video activo (la señal blank las enmascara).
+ *
+ *   Latencia de lectura: 1 ciclo de reloj (registro de salida BRAM).
+ *   El vram_writer compensa esta latencia mediante su pipeline interno de 1 ciclo.
+ *
+ * @author JustinAlfaro
+ * @date 2026-05-08
+ */
 
 `timescale 1ns / 1ps
 
 module bg_rom (
-    input  wire        clk,
-    input  wire [9:0]  h_count,
-    input  wire [9:0]  v_count,
-    output reg  [11:0] bg_color
+    input  wire        clk,      ///< Reloj del sistema (100 MHz)
+    input  wire [9:0]  h_count,  ///< Coordenada horizontal del píxel [9:0]
+    input  wire [9:0]  v_count,  ///< Coordenada vertical del píxel [9:0]
+    output reg  [11:0] bg_color  ///< Color de fondo RGB 4-4-4; válido 1 ciclo después de h/v_count
 );
 
     (* rom_style = "block" *) reg [11:0] mem [0:32767];

@@ -1,35 +1,30 @@
-// -----------------------------------------------------------------------------
-// Module      : debounce
-// Description : Button debouncer using a saturation counter. Output goes high
-//               for exactly one clock cycle when a stable rising edge is
-//               detected (button held stable HIGH for DEBOUNCE_MS).
-// Author      : JustinAlfaro
-// Date        : 2026-04-22
-// Parameters:
-//   DEBOUNCE_MS  - Debounce window in milliseconds (default 20 ms)
-//   CLK_FREQ_HZ  - Input clock frequency in Hz (default 100 MHz)
-// Ports:
-//   clk        - System clock
-//   rst        - Synchronous active-high reset
-//   btn_in     - Raw (bouncy) button input
-//   btn_out    - Debounced single-cycle pulse on confirmed rising edge
-// -----------------------------------------------------------------------------
+/**
+ * @title Debouncer de botón
+ * @file debounce.v
+ * @brief Elimina rebotes de botones usando un contador de saturación. Genera un pulso de un ciclo en flanco estable.
+ * @details
+ *   Incluye un sincronizador de dos etapas para la entrada asíncrona.
+ *   La salida btn_out se activa exactamente un ciclo de reloj cuando el botón
+ *   permanece estable en alto durante DEBOUNCE_MS milisegundos.
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-22
+ */
 
 `timescale 1ns / 1ps
 
 module debounce #(
-    parameter integer DEBOUNCE_MS  = 20,
-    parameter integer CLK_FREQ_HZ  = 100_000_000
+    parameter integer DEBOUNCE_MS  = 20,          ///< Ventana de debounce en milisegundos
+    parameter integer CLK_FREQ_HZ  = 100_000_000  ///< Frecuencia del reloj de entrada en Hz
 )(
-    input  wire clk,
-    input  wire rst,
-    input  wire btn_in,
-    output reg  btn_out
+    input  wire clk,     ///< Reloj del sistema
+    input  wire rst,     ///< Reset síncrono activo alto
+    input  wire btn_in,  ///< Entrada cruda del botón (con rebotes)
+    output reg  btn_out  ///< Pulso de un ciclo en flanco confirmado de subida
 );
     localparam integer COUNT_MAX = (CLK_FREQ_HZ / 1000) * DEBOUNCE_MS - 1;
     localparam integer CNT_BITS  = $clog2(COUNT_MAX + 1);
 
-    // Two-stage synchronizer
     reg [1:0] sync_ff;
     wire      btn_sync = sync_ff[1];
 
@@ -53,7 +48,6 @@ module debounce #(
                 btn_prev <= btn_sync;
             end else if (count < COUNT_MAX[CNT_BITS-1:0]) begin
                 count <= count + 1'b1;
-                // Fire on the last increment cycle while input is stable high
                 if (count == COUNT_MAX[CNT_BITS-1:0] - 1'b1 && btn_sync)
                     btn_out <= 1'b1;
             end
