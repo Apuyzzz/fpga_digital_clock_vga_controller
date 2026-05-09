@@ -1,28 +1,25 @@
-// -----------------------------------------------------------------------------
-// Module      : sync_signal
-// Description : 2-stage synchronizer for asynchronous inputs (e.g. SW[15:0]).
-//               Prevents metastability when crossing clock domains.
-// Author      : JustinAlfaro
-// Date        : 2026-04-21
-// Parameters:
-//   WIDTH - Number of bits to synchronize (default 16 for SW[15:0])
-// -----------------------------------------------------------------------------
-// Ports:
-//   clk      - Destination clock domain
-//   rst      - Synchronous active-high reset
-//   async_in - Asynchronous input bus
-//   sync_out - Synchronized output bus
-// -----------------------------------------------------------------------------
+/**
+ * @title Sincronizador de dos etapas
+ * @file sync_signal.v
+ * @brief Sincronizador de bus de WIDTH bits para prevenir metaestabilidad en entradas asíncronas.
+ * @details
+ *   Implementa un doble flip-flop (two-stage synchronizer) marcado con
+ *   el atributo ASYNC_REG para que Vivado los coloque adyacentes y minimice MTBF.
+ *   Usado principalmente para sincronizar SW[15:0] al dominio de 100 MHz.
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-21
+ */
 
 `timescale 1ns / 1ps
 
 module sync_signal #(
-    parameter integer WIDTH = 16
+    parameter integer WIDTH = 16  ///< Número de bits a sincronizar (default: 16 para SW[15:0])
 )(
-    input  wire             clk,
-    input  wire             rst,
-    input  wire [WIDTH-1:0] async_in,
-    output wire [WIDTH-1:0] sync_out
+    input  wire             clk,      ///< Reloj del dominio destino
+    input  wire             rst,      ///< Reset síncrono activo alto
+    input  wire [WIDTH-1:0] async_in, ///< Bus de entrada asíncrona
+    output wire [WIDTH-1:0] sync_out  ///< Bus sincronizado al dominio de clk
 );
 
     (* ASYNC_REG = "TRUE" *) reg [WIDTH-1:0] stage1;

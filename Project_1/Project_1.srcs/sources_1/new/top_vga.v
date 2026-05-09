@@ -1,58 +1,46 @@
-// -----------------------------------------------------------------------------
-// Module      : top_vga
-// Description : Root integration module for the FPGA Digital Clock VGA
-//               Controller on Nexys A7-100T. Single 100 MHz clock domain with
-//               pixel-clock and 1 Hz clock-enables (no CDC required).
-//               VGA timing: 640x480 @ 60 Hz (25 MHz pixel clock enable).
-//
-//               bg_rom (BRAM ROM, 160x120 pixel-art, 4x scaled) provides the
-//               background with 1-cycle latency; text_renderer outputs are
-//               registered by the same 1 cycle. All signals align with the
-//               1-cycle-delayed sync signals from the VGA controller.
-//
-//   Controls:
-//     BTNC  — cycle adjust mode: RUN → ADJ_HOUR → ADJ_MIN → RUN
-//     BTNU  — increment selected field
-//     BTND  — decrement selected field
-//     BTNR  — accept (btn_ajuste): confirm changes and return to RUN
-//     SW[0] — 12h/24h display mode (0=24h, 1=12h)
-//
-//   Blink (no blink module): blink_phase toggles every tick_1hz.  When a
-//   field is being adjusted the text_renderer substitutes its BCD digits with
-//   4'hF (absent from font ROM → font_row=0 → invisible). Button press resets
-//   blink_phase to 0 so the digit is immediately visible after adjustment.
-//
-// Author      : JustinAlfaro
-// Date        : 2026-04-22
-// -----------------------------------------------------------------------------
-// Board: Nexys A7-100T (xc7a100tcsg324-1)
-// -----------------------------------------------------------------------------
+/**
+ * @title Top — Controlador VGA con Reloj Digital
+ * @file top_vga.v
+ * @brief Módulo de integración raíz del reloj digital VGA sobre Nexys A7-100T.
+ * @details
+ *   Dominio de reloj único a 100 MHz con clock enables derivados (tick_25mhz, tick_1hz).
+ *   No requiere CDC. Temporización VGA: 640×480 @ 60 Hz.
+ *
+ *   Pipeline de video: bg_rom (ROM BRAM, imagen pixel art 160×120, escala 4×) alimenta
+ *   al vram_writer, que compensa la latencia de 1 ciclo de la ROM mediante su pipeline
+ *   interno. La VRAM (bram_dualport, 307200×12-bit) es leída por el controlador VGA.
+ *
+ *   Controles:
+ *     BTNC — cicla modo ajuste: RUN → ADJ_HOUR → ADJ_MIN → RUN
+ *     BTNU — incrementa campo seleccionado
+ *     BTND — decrementa campo seleccionado
+ *     BTNR — acepta (btn_ajuste): confirma y vuelve a RUN
+ *     SW[0] — 0=formato 24h, 1=formato 12h con AM/PM
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-22
+ */
 
 `timescale 1ns / 1ps
 
 module top_vga (
-    // Clock & Reset
-    input  wire        CLK100MHZ,
-    input  wire        CPU_RESETN,   // Active-low board reset
+    input  wire        CLK100MHZ,  ///< Reloj de la placa (100 MHz)
+    input  wire        CPU_RESETN, ///< Reset de la placa activo bajo
 
-    // Buttons (active-high after debounce)
-    input  wire        BTNC,         // Mode cycle
-    input  wire        BTNU,         // Increment
-    input  wire        BTND,         // Decrement
-    input  wire        BTNR,         // Accept / confirm (btn_ajuste)
+    input  wire        BTNC,       ///< Botón centro: cicla modo de ajuste
+    input  wire        BTNU,       ///< Botón arriba: incrementa campo seleccionado
+    input  wire        BTND,       ///< Botón abajo: decrementa campo seleccionado
+    input  wire        BTNR,       ///< Botón derecha: acepta ajuste y vuelve a RUN
 
-    // Switches
-    input  wire [15:0] SW,
+    input  wire [15:0] SW,         ///< Switches: SW[0]=modo 12h/24h
 
-    // VGA
-    output wire        VGA_HS,
-    output wire        VGA_VS,
-    output wire [3:0]  VGA_R,
-    output wire [3:0]  VGA_G,
-    output wire [3:0]  VGA_B,
+    output wire        VGA_HS,     ///< Sincronismo horizontal VGA
+    output wire        VGA_VS,     ///< Sincronismo vertical VGA
+    output wire [3:0]  VGA_R,      ///< Canal rojo VGA [3:0]
+    output wire [3:0]  VGA_G,      ///< Canal verde VGA [3:0]
+    output wire [3:0]  VGA_B,      ///< Canal azul VGA [3:0]
 
-    // LEDs (mode indicator on LD[1:0])
-    output wire [15:0] LED
+    output wire [15:0] LED         ///< LEDs: [1:0]=modo ajuste, [3]=12h activo, [4]=PM
 );
 
     // ---- Internal reset (active-high) ----------------------------------------

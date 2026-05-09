@@ -1,62 +1,43 @@
-// -----------------------------------------------------------------------------
-// Module      : text_renderer
-// Description : Combinational pixel renderer for the clock display.
-//
-//   Layout (scale = 4; each char = 32×64 px):
-//     24-h mode : 8  chars "HH:MM:SS"       → H_START=192, H_END=448 (centered)
-//     12-h mode : 11 chars "HH:MM:SS _AM/PM"→ H_START=144, H_END=496 (centered)
-//
-//   Blink (no blink module): when adj_hour|adj_min AND blink_phase=1, the
-//   selected field's char_idx is forced to 4'hF. That index is absent from the
-//   font ROM case statement so font_row defaults to 8'h00 → pixel_on=0 → digit
-//   disappears for that VRAM frame.  The vram_writer redraws every tick_1hz;
-//   blink_phase also toggles every tick_1hz, so the digit alternates on/off
-//   at 0.5 Hz — visible without any dedicated blink counter module.
-//
-//   AM/PM glyphs: index 0xB='A', 0xC='P', 0xD='M'. In 24-h mode those
-//   character positions carry index 0xF which falls to the ROM default (0x00).
-//
-//   Font: pixel-art style, bold 8×16 bitmap (scale 4 → 32×64 on screen).
-//
-// Author      : JustinAlfaro
-// Date        : 2026-04-22
-// -----------------------------------------------------------------------------
-// Ports:
-//   h_count       - Horizontal pixel [9:0]
-//   v_count       - Vertical pixel [9:0]
-//   hour_tens     - Display-ready hours tens BCD [3:0] (24h or 12h, pre-muxed)
-//   hour_ones     - Display-ready hours ones BCD [3:0]
-//   min_tens      - Minutes tens BCD [3:0]
-//   min_ones      - Minutes ones BCD [3:0]
-//   sec_tens      - Seconds tens BCD [3:0]
-//   sec_ones      - Seconds ones BCD [3:0]
-//   adj_hour      - High in ADJ_HOUR state
-//   adj_min       - High in ADJ_MIN  state
-//   blink_phase   - Blink state: 1 = render selected field as blank (4'hF)
-//   mode_12h      - 1 = 12-hour display with AM/PM suffix
-//   is_pm         - 1 = PM (used to choose 'P' vs 'A' glyph in 12-h mode)
-//   pixel_on      - 1 = this pixel is a foreground text pixel
-//   text_color    - 12-bit color {R,G,B} for foreground pixel
-// -----------------------------------------------------------------------------
+/**
+ * @title Renderizador de texto del reloj
+ * @file text_render.v
+ * @brief Renderer combinacional de píxeles para el display del reloj digital.
+ * @details
+ *   Layout (escala=4; cada carácter = 32×64 px en pantalla):
+ *     Modo 24h: 8 chars "HH:MM:SS"        → H_START=192, H_END=448 (centrado)
+ *     Modo 12h: 11 chars "HH:MM:SS AM/PM" → H_START=144, H_END=496 (centrado)
+ *
+ *   Parpadeo sin módulo dedicado: cuando adj_hour|adj_min y blink_phase=1,
+ *   el char_idx del campo seleccionado se fuerza a 4'hF (ausente en la ROM de
+ *   fuente → font_row=0 → pixel_on=0 → dígito invisible). El vram_writer
+ *   redibuja cada tick_1hz; blink_phase también alterna cada tick_1hz, logrando
+ *   parpadeo a 0.5 Hz sin contador adicional.
+ *
+ *   Glyphs AM/PM: índice 0xB='A', 0xC='P', 0xD='M'.
+ *   Fuente: pixel-art bold 8×16 bitmap (escala 4 → 32×64 en pantalla).
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-22
+ */
 
 `timescale 1ns / 1ps
 
 module text_renderer (
-    input  wire [9:0]  h_count,
-    input  wire [9:0]  v_count,
-    input  wire [3:0]  hour_tens,
-    input  wire [3:0]  hour_ones,
-    input  wire [3:0]  min_tens,
-    input  wire [3:0]  min_ones,
-    input  wire [3:0]  sec_tens,
-    input  wire [3:0]  sec_ones,
-    input  wire        adj_hour,
-    input  wire        adj_min,
-    input  wire        blink_phase,
-    input  wire        mode_12h,
-    input  wire        is_pm,
-    output reg         pixel_on,
-    output reg  [11:0] text_color
+    input  wire [9:0]  h_count,     ///< Coordenada horizontal del píxel [9:0]
+    input  wire [9:0]  v_count,     ///< Coordenada vertical del píxel [9:0]
+    input  wire [3:0]  hour_tens,   ///< Decenas de hora pre-muxeadas (24h o 12h) [BCD]
+    input  wire [3:0]  hour_ones,   ///< Unidades de hora pre-muxeadas [BCD]
+    input  wire [3:0]  min_tens,    ///< Decenas de minutos [BCD]
+    input  wire [3:0]  min_ones,    ///< Unidades de minutos [BCD]
+    input  wire [3:0]  sec_tens,    ///< Decenas de segundos [BCD]
+    input  wire [3:0]  sec_ones,    ///< Unidades de segundos [BCD]
+    input  wire        adj_hour,    ///< Alto en estado ADJ_HOUR (activa parpadeo de horas)
+    input  wire        adj_min,     ///< Alto en estado ADJ_MIN (activa parpadeo de minutos)
+    input  wire        blink_phase, ///< Fase de parpadeo: 1=campo seleccionado invisible
+    input  wire        mode_12h,    ///< 1=display en formato 12h con sufijo AM/PM
+    input  wire        is_pm,       ///< 1=PM; selecciona glyph 'P' vs 'A' en modo 12h
+    output reg         pixel_on,    ///< 1 si el píxel actual es foreground de texto
+    output reg  [11:0] text_color   ///< Color RGB 4-4-4 para píxel de texto
 );
 
     // ---- Vertical region (constant for both modes) ---------------------------

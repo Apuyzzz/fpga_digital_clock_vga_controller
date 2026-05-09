@@ -1,35 +1,28 @@
-// -----------------------------------------------------------------------------
-// Module      : bcd_counter
-// Description : Parametric BCD counter with configurable upper limit. Supports
-//               auto-increment (clock enable), manual increment/decrement for
-//               adjustment mode, and carry output for chaining.
-// Author      : JustinAlfaro
-// Date        : 2026-04-21
-// Parameters:
-//   MAX_VAL - Maximum count value inclusive (default 59 for min/sec)
-// -----------------------------------------------------------------------------
-// Ports:
-//   clk        - System clock (100 MHz)
-//   rst        - Synchronous active-high reset
-//   clk_en     - Clock enable: auto-increments counter when high (1 Hz pulse)
-//   inc        - Manual increment pulse (from FSM in adjust mode)
-//   dec        - Manual decrement pulse (from FSM in adjust mode)
-//   count      - Current count [5:0] (enough for 0-59)
-//   carry_out  - Pulses high for one cycle when counter wraps 0 (for chaining)
-// -----------------------------------------------------------------------------
+/**
+ * @title Contador BCD paramétrico
+ * @file bcd_counter.v
+ * @brief Contador BCD con límite superior configurable, auto-incremento y ajuste manual.
+ * @details
+ *   Soporta auto-incremento por clock enable (tick de 1 Hz), incremento/decremento
+ *   manual para el modo de ajuste, y salida de acarreo para encadenamiento
+ *   (segundos → minutos → horas).
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-21
+ */
 
 `timescale 1ns / 1ps
 
 module bcd_counter #(
-    parameter integer MAX_VAL = 59
+    parameter integer MAX_VAL = 59  ///< Valor máximo inclusive (59 para min/seg, 23 para horas)
 )(
-    input  wire       clk,
-    input  wire       rst,
-    input  wire       clk_en,
-    input  wire       inc,
-    input  wire       dec,
-    output reg  [5:0] count,
-    output reg        carry_out
+    input  wire       clk,       ///< Reloj del sistema (100 MHz)
+    input  wire       rst,       ///< Reset síncrono activo alto
+    input  wire       clk_en,    ///< Clock enable: auto-incrementa cuando alto (pulso de 1 Hz)
+    input  wire       inc,       ///< Pulso de incremento manual (desde FSM en modo ajuste)
+    input  wire       dec,       ///< Pulso de decremento manual (desde FSM en modo ajuste)
+    output reg  [5:0] count,     ///< Valor actual del contador [0-MAX_VAL]
+    output reg        carry_out  ///< Alto un ciclo cuando el contador hace rollover a 0
 );
 
     always @(posedge clk) begin

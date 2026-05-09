@@ -1,24 +1,23 @@
-// -----------------------------------------------------------------------------
-// Module      : bg_generator
-// Description : Combinational background color generator. Produces a deep-space
-//               themed background: dark navy gradient with a subtle horizontal
-//               band effect and corner vignette. Uses only h_count and v_count.
-//               Output is 12-bit RGB (4-4-4 format): {R[3:0], G[3:0], B[3:0]}.
-// Author      : JustinAlfaro
-// Date        : 2026-04-21
-// -----------------------------------------------------------------------------
-// Ports:
-//   h_count  - Horizontal pixel coordinate [9:0] (0-639)
-//   v_count  - Vertical pixel coordinate [9:0] (0-479)
-//   bg_color - Output background color [11:0] = {R,G,B} 4 bits each
-// -----------------------------------------------------------------------------
+/**
+ * @title Generador de fondo algorítmico
+ * @file bg_generator.v
+ * @brief Generador combinacional de color de fondo con gradiente navy y efecto vignette.
+ * @details
+ *   Produce un fondo temático "espacio profundo": gradiente navy oscuro con bandas
+ *   horizontales sutiles y oscurecimiento en las esquinas (vignette).
+ *   Solo utiliza h_count y v_count como entradas; sin latencia.
+ *   Nota: este módulo está deshabilitado (AutoDisabled) en favor de bg_rom.
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-21
+ */
 
 `timescale 1ns / 1ps
 
 module bg_generator (
-    input  wire [9:0]  h_count,
-    input  wire [9:0]  v_count,
-    output reg  [11:0] bg_color
+    input  wire [9:0]  h_count,   ///< Coordenada horizontal del píxel [0-639]
+    input  wire [9:0]  v_count,   ///< Coordenada vertical del píxel [0-479]
+    output reg  [11:0] bg_color   ///< Color de fondo RGB 4-4-4: {R[3:0], G[3:0], B[3:0]}
 );
 
     // ----- Gradient parameters -----------------------------------------------
