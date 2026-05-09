@@ -31,6 +31,7 @@ TB_NAMES=(
     "tb_fsm_adjust_mode"
     "tb_binary_bcd_decoder"
     "tb_hour_converter"
+    "tb_integration"
 )
 
 # --------------------------------------------------------------------------
@@ -44,6 +45,7 @@ declare -A TB_DEPS=(
     ["tb_fsm_adjust_mode"]="fsm_adjust_mode.v"
     ["tb_binary_bcd_decoder"]="binary_bcd_decoder.v"
     ["tb_hour_converter"]="hour_converter.v"
+    ["tb_integration"]="bcd_counter.v fsm_adjust_mode.v binary_bcd_decoder.v hour_converter.v mux2.v"
 )
 
 PASS_COUNT=0
