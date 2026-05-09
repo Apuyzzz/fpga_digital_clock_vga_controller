@@ -5,10 +5,10 @@
 //               pixel-clock and 1 Hz clock-enables (no CDC required).
 //               VGA timing: 640x480 @ 60 Hz (25 MHz pixel clock enable).
 //
-//               Pixels are rendered combinationally (text_renderer + bg_generator
-//               are purely combinational), registered once, and output directly —
-//               no BRAM framebuffer needed. The 1-cycle register matches the
-//               sync signal delay already present in the VGA controller.
+//               bg_rom (BRAM ROM, 160x120 pixel-art, 4x scaled) provides the
+//               background with 1-cycle latency; text_renderer outputs are
+//               registered by the same 1 cycle. All signals align with the
+//               1-cycle-delayed sync signals from the VGA controller.
 //
 //   Controls:
 //     BTNC  — cycle adjust mode: RUN → ADJ_HOUR → ADJ_MIN → RUN
@@ -233,19 +233,20 @@ module top_vga (
     assign VGA_VS = vsync_d;
 
     // =========================================================================
-    // 9. Background generator + Text renderer (combinational, scan-time)
+    // 9. Background ROM + Text renderer
     //
-    //    Both modules are purely combinational: pixel color is computed
-    //    directly from h_count/v_count each clock cycle with no BRAM needed.
-    //    A single register stage aligns the pixel data with the 1-cycle
-    //    delayed sync signals produced by the VGA controller.
+    //    bg_rom is a synchronous BRAM ROM (1-cycle read latency).
+    //    text_renderer is combinational; its outputs are registered 1 cycle
+    //    to match the ROM latency. bg_color, pixel_on_d, text_color_d and
+    //    blank_d/hsync_d/vsync_d are all 1-cycle delayed → aligned.
     // =========================================================================
 
     wire [11:0] bg_color;
     wire        pixel_on;
     wire [11:0] text_color_w;
 
-    bg_generator u_bg (
+    bg_rom u_bg (
+        .clk    (CLK100MHZ),
         .h_count(h_count),
         .v_count(v_count),
         .bg_color(bg_color)
@@ -269,11 +270,15 @@ module top_vga (
         .text_color(text_color_w)
     );
 
-    // Merge combinational outputs and register once (1-cycle pipeline stage)
-    wire [11:0] pixel_comb = pixel_on ? text_color_w : bg_color;
-    reg  [11:0] pixel_reg;
-    always @(posedge CLK100MHZ)
-        pixel_reg <= pixel_comb;
+    // Delay text outputs 1 cycle to match bg_rom synchronous read latency
+    reg        pixel_on_d;
+    reg [11:0] text_color_d;
+    always @(posedge CLK100MHZ) begin
+        pixel_on_d   <= pixel_on;
+        text_color_d <= text_color_w;
+    end
+
+    wire [11:0] pixel_reg = pixel_on_d ? text_color_d : bg_color;
 
     // =========================================================================
     // 10. Pixel output mux
