@@ -249,7 +249,8 @@ module top_vga (
     );
 
     // =========================================================================
-    // 10. Background generator + Text renderer (combinational)
+    // 10. Background ROM + Text renderer
+    // bg_rom has 1-cycle read latency; vram_writer compensates internally.
     // =========================================================================
 
     wire [9:0]  h_wr, v_wr;
@@ -257,7 +258,8 @@ module top_vga (
     wire        pixel_on;
     wire [11:0] text_color_w;
 
-    bg_generator u_bg (
+    bg_rom u_bg (
+        .clk    (CLK100MHZ),
         .h_count(h_wr), .v_count(v_wr), .bg_color(bg_color));
 
     text_renderer u_text (

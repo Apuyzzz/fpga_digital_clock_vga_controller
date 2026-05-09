@@ -3,30 +3,27 @@
 // Description : Sequential FSM that redraws the entire 640x480 VRAM once per
 //               redraw request. Runs at 100 MHz; a full frame takes 307 200
 //               cycles (~3.07 ms, well within the 1-second update window).
-//               For each pixel the combinational outputs of bg_generator and
-//               text_renderer are merged: text foreground takes priority.
-//               Signals bg_color and pixel_on/text_color come from external
-//               combinational modules driven by the writer's own h_wr/v_wr.
+//
+//               bg_color comes from bg_rom (synchronous, 1-cycle latency from
+//               h_wr/v_wr). A 1-cycle internal pipeline compensates: Stage 1
+//               latches the pixel's address and text data while bg_rom reads;
+//               Stage 2 commits to BRAM once bg_color is valid.
+//
 // Author      : JustinAlfaro
 // Date        : 2026-04-21
 // -----------------------------------------------------------------------------
 // Ports:
 //   clk          - 100 MHz system clock
 //   rst          - Synchronous active-high reset
-//   redraw_req   - Pulse: triggers a full-frame redraw (connect to tick_1hz
-//                  OR to any button-press event)
-//   -- bg_generator interface (combinational, driven by h_wr / v_wr) --
-//   h_wr         - Current write column [9:0] exposed to bg_generator
-//   v_wr         - Current write row    [9:0] exposed to text_renderer
-//   bg_color     - 12-bit background color from bg_generator
-//   -- text_renderer interface --
-//   pixel_on     - 1 if current pixel is a character foreground
-//   text_color   - 12-bit text color from text_renderer
-//   -- BRAM Port B interface --
+//   redraw_req   - Pulse: triggers a full-frame redraw
+//   h_wr         - Current write column [9:0] → bg_rom + text_renderer
+//   v_wr         - Current write row    [9:0] → bg_rom + text_renderer
+//   bg_color     - 12-bit background from bg_rom (valid 1 cycle after h_wr/v_wr)
+//   pixel_on     - 1 if current pixel is a character foreground (combinational)
+//   text_color   - 12-bit text color from text_renderer (combinational)
 //   bram_addr    - Write address to BRAM port B [18:0]
 //   bram_din     - Write data to BRAM port B [11:0]
 //   bram_we      - Write enable for BRAM port B
-//   -- Status --
 //   drawing      - High while a redraw is in progress
 // -----------------------------------------------------------------------------
 
@@ -37,16 +34,13 @@ module vram_writer (
     input  wire        rst,
     input  wire        redraw_req,
 
-    // Pixel coordinate outputs for combinational modules
     output reg  [9:0]  h_wr,
     output reg  [9:0]  v_wr,
 
-    // Color inputs from combinational modules
     input  wire [11:0] bg_color,
     input  wire        pixel_on,
     input  wire [11:0] text_color,
 
-    // BRAM port B
     output reg  [18:0] bram_addr,
     output reg  [11:0] bram_din,
     output reg         bram_we,
@@ -54,31 +48,46 @@ module vram_writer (
     output reg         drawing
 );
 
-    // FSM states
-    localparam [1:0]
-        IDLE = 2'd0,
-        DRAW = 2'd1,
-        DONE = 2'd2;
+    localparam [1:0] IDLE = 2'd0, DRAW = 2'd1, DONE = 2'd2;
+    localparam H_MAX = 10'd639, V_MAX = 10'd479;
 
-    reg [1:0] state;
-
-    // Pixel address (linear 0..307199)
+    reg [1:0]  state;
     reg [18:0] px_addr;
 
-    // Screen dimensions
-    localparam H_MAX = 10'd639;
-    localparam V_MAX = 10'd479;
+    // Stage 1 pipeline registers: latch while bg_rom performs its read
+    reg [18:0] addr_pipe;
+    reg        we_pipe;
+    reg        on_pipe;
+    reg [11:0] tcolor_pipe;
 
+    // Stage 2: commit to BRAM — bg_color is now valid for the latched pixel
     always @(posedge clk) begin
         if (rst) begin
-            state    <= IDLE;
-            h_wr     <= 10'd0;
-            v_wr     <= 10'd0;
-            px_addr  <= 19'd0;
-            bram_we  <= 1'b0;
-            drawing  <= 1'b0;
+            bram_addr <= 19'd0;
+            bram_din  <= 12'd0;
+            bram_we   <= 1'b0;
         end else begin
-            bram_we <= 1'b0; // Default
+            bram_addr <= addr_pipe;
+            bram_din  <= on_pipe ? tcolor_pipe : bg_color;
+            bram_we   <= we_pipe;
+        end
+    end
+
+    // FSM + Stage 1
+    always @(posedge clk) begin
+        if (rst) begin
+            state       <= IDLE;
+            h_wr        <= 10'd0;
+            v_wr        <= 10'd0;
+            px_addr     <= 19'd0;
+            drawing     <= 1'b0;
+            addr_pipe   <= 19'd0;
+            we_pipe     <= 1'b0;
+            on_pipe     <= 1'b0;
+            tcolor_pipe <= 12'd0;
+        end else begin
+            addr_pipe <= 19'd0;
+            we_pipe   <= 1'b0;
 
             case (state)
                 IDLE: begin
@@ -93,23 +102,21 @@ module vram_writer (
                 end
 
                 DRAW: begin
-                    drawing   <= 1'b1;
-                    bram_addr <= px_addr;
-                    bram_din  <= pixel_on ? text_color : bg_color;
-                    bram_we   <= 1'b1;
+                    drawing     <= 1'b1;
+                    // Stage 1: latch pixel data while bg_rom reads (h_wr, v_wr)
+                    addr_pipe   <= px_addr;
+                    we_pipe     <= 1'b1;
+                    on_pipe     <= pixel_on;
+                    tcolor_pipe <= text_color;
 
-                    // Advance pixel coordinates
                     if (h_wr == H_MAX) begin
                         h_wr <= 10'd0;
-                        if (v_wr == V_MAX) begin
-                            // Frame complete
+                        if (v_wr == V_MAX)
                             state <= DONE;
-                        end else begin
+                        else
                             v_wr <= v_wr + 10'd1;
-                        end
-                    end else begin
+                    end else
                         h_wr <= h_wr + 10'd1;
-                    end
 
                     if (px_addr == 19'd307199)
                         px_addr <= 19'd0;
@@ -119,7 +126,6 @@ module vram_writer (
 
                 DONE: begin
                     drawing <= 1'b0;
-                    bram_we <= 1'b0;
                     if (redraw_req) begin
                         h_wr    <= 10'd0;
                         v_wr    <= 10'd0;
