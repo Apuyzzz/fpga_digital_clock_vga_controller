@@ -1,15 +1,16 @@
-// =============================================================================
-// Testbench   : tb_div_freq
-// Description : Verifica div_freq con 4 casos de prueba:
-//
-//   TEST 1 - Reset síncrono       : tick debe permanecer en 0
-//   TEST 2 - Divisor pequeño (4)  : tick cada 4 ciclos exactos
-//   TEST 3 - Tick dura 1 ciclo    : tick nunca se extiende más de 1 ciclo
-//   TEST 4 - Conteo de pulsos     : número de ticks en N ciclos = N/DIVISOR
-//
-// Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseño Digital - EL3313 - I Semestre 2026
-// =============================================================================
+/**
+ * @title Testbench — div_freq
+ * @file tb_div_freq.v
+ * @brief Verifica div_freq con divisor reducido (DIVISOR=4) para simulación rápida.
+ * @details
+ *   TEST 1 - Reset síncrono      : tick debe permanecer en 0
+ *   TEST 2 - Divisor pequeño (4) : tick cada 4 ciclos exactos
+ *   TEST 3 - Tick dura 1 ciclo   : tick nunca se extiende más de 1 ciclo
+ *   TEST 4 - Conteo de pulsos    : número de ticks en N ciclos = N/DIVISOR
+ *
+ * @author hidalgojeulin
+ * @date 2026-04-27
+ */
 
 `timescale 1ns / 1ps
 

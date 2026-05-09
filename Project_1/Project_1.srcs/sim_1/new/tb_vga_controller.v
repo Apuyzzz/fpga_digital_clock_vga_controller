@@ -1,21 +1,19 @@
-// =============================================================================
-// Testbench   : tb_vga_controller
-// Description : Verifica vga_controller con 5 casos de prueba:
-//
-//   TEST 1 - Reset           : h=0, v=0, hsync=1, vsync=1, blank=0
-//   TEST 2 - Temporiz. H     : HSYNC baja en H=657, sube en H=753
-//                              (1 ciclo de pipeline: hsync se registra
-//                               usando h_count del ciclo anterior)
-//   TEST 3 - Temporiz. V     : VSYNC baja en V=491, sube en V=493
-//                              (mismo offset de pipeline)
-//   TEST 4 - Area activa     : blank=0 en zona visible, blank=1 en blanking
-//   TEST 5 - Periodo frame   : 800 * 525 ciclos entre vsync consecutivos
-//
-// NOTA: tick_25mhz = 1 siempre (1 pixel = 1 ciclo de 100 MHz).
-//
-// Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
-// =============================================================================
+/**
+ * @title Testbench — vga_controller
+ * @file tb_vga_controller.v
+ * @brief Verifica vga_controller 640×480@60 Hz con tick_25mhz fijo a 1.
+ * @details
+ *   TEST 1 - Reset         : h=0, v=0, hsync=1, vsync=1, blank=0
+ *   TEST 2 - Temporiz. H   : HSYNC baja en H=657, sube en H=753
+ *                            (offset +1 ciclo de pipeline)
+ *   TEST 3 - Temporiz. V   : VSYNC baja en V=490, sube en V=492
+ *                            (mismo offset de pipeline)
+ *   TEST 4 - Área activa   : blank=0 en zona visible, blank=1 en blanking
+ *   TEST 5 - Período frame : 800×525 ciclos entre vsync consecutivos
+ *
+ * @author hidalgojeulin
+ * @date 2026-04-27
+ */
 
 `timescale 1ns / 1ps
 

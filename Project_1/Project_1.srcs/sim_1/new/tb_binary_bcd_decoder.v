@@ -1,15 +1,14 @@
-// =============================================================================
-// Testbench   : tb_binary_bcd_decoder
-// Description : Prueba exhaustiva del convertidor binario->BCD (Double Dabble).
-//               Instancia N=6 (rango 0-59) y N=5 (rango 0-23).
-//               Verifica bcd_tens = bin/10, bcd_ones = bin%10.
-//
-//   TEST 1 - N=6 (segundos/minutos): todos los valores 0-59
-//   TEST 2 - N=5 (horas)           : todos los valores 0-23
-//
-// Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
-// =============================================================================
+/**
+ * @title Testbench — binary_bcd_decoder
+ * @file tb_binary_bcd_decoder.v
+ * @brief Prueba exhaustiva del convertidor binario→BCD (Double Dabble), N=6 y N=5.
+ * @details
+ *   TEST 1 - N=6 (segundos/minutos) : todos los valores 0-59
+ *   TEST 2 - N=5 (horas)            : todos los valores 0-23
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-28
+ */
 
 `timescale 1ns / 1ps
 

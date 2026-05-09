@@ -1,21 +1,16 @@
-// =============================================================================
-// Testbench   : tb_bcd_counter
-// Description : Verifica bcd_counter parametrizado con MAX_VAL.
-//               El mismo testbench corre correctamente para MAX_VAL=59 y
-//               MAX_VAL=23 porque todos los valores criticos se calculan
-//               automaticamente a partir de MAX_VAL.
-//
-//   Para probar seg/min: dejar MAX_VAL = 59
-//   Para probar horas  : cambiar MAX_VAL = 23
-//
-//   TEST 1 - Reset sincrono    : count debe quedar en 0
-//   TEST 2 - Conteo normal     : count correcto de 0 a 15
-//   TEST 3 - Rollover y carry  : verifica MAX_VAL-1, MAX_VAL y rollover
-//   TEST 4 - Enable gating     : sin clk_en=1 el contador NO avanza
-//
-// Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
-// =============================================================================
+/**
+ * @title Testbench — bcd_counter
+ * @file tb_bcd_counter.v
+ * @brief Verifica bcd_counter parametrizado con MAX_VAL=59 (seg/min) y MAX_VAL=23 (horas).
+ * @details
+ *   TEST 1 - Reset síncrono   : count debe quedar en 0
+ *   TEST 2 - Conteo normal    : count correcto de 0 a 15
+ *   TEST 3 - Rollover y carry : verifica MAX_VAL-1, MAX_VAL y rollover
+ *   TEST 4 - Enable gating    : sin clk_en=1 el contador NO avanza
+ *
+ * @author hidalgojeulin
+ * @date 2026-04-27
+ */
 
 `timescale 1ns / 1ps
 

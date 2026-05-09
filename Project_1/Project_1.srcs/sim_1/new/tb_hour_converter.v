@@ -1,22 +1,19 @@
-// =============================================================================
-// Testbench   : tb_hour_converter
-// Description : Verifica la conversion 24h -> 12h + AM/PM.
-//               Casos criticos y exhaustivo 0-23.
-//
-//   Mapeo esperado (segun spec):
-//     0  -> 12 AM (medianoche)
-//     1  ->  1 AM
-//    11  -> 11 AM
-//    12  -> 12 PM (mediodia)
-//    13  ->  1 PM
-//    23  -> 11 PM
-//
-//   TEST 1 - Casos criticos : 0, 1, 11, 12, 13, 23
-//   TEST 2 - Exhaustivo     : todos los valores 0-23
-//
-// Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
-// =============================================================================
+/**
+ * @title Testbench — hour_converter
+ * @file tb_hour_converter.v
+ * @brief Verifica la conversión 24h → 12h + AM/PM, casos críticos y exhaustivo 0-23.
+ * @details
+ *   Mapeo esperado (según spec):
+ *      0 → 12 AM (medianoche)   12 → 12 PM (mediodía)
+ *      1 →  1 AM                13 →  1 PM
+ *     11 → 11 AM                23 → 11 PM
+ *
+ *   TEST 1 - Casos críticos : 0, 1, 11, 12, 13, 23
+ *   TEST 2 - Exhaustivo     : todos los valores 0-23
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-28
+ */
 
 `timescale 1ns / 1ps
 

@@ -1,16 +1,17 @@
-// =============================================================================
-// Testbench   : tb_debounce
-// Description : Verifica la cadena completa sync_signal -> debounce -> bcd_counter.
-//
-//   TEST 1 - Reset              : btn_out=0, count_raw=0
-//   TEST 2 - Rebote corto       : pulso < STABLE no genera btn_out
-//   TEST 3 - Presion limpia     : btn_out=1 exactamente 1 ciclo
-//   TEST 4 - bcd_counter incr.  : un pulso limpio incrementa count_raw
-//   TEST 5 - Rebote al soltar   : no genera pulsos extra
-//
-// Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
-// =============================================================================
+/**
+ * @title Testbench — debounce
+ * @file tb_debounce.v
+ * @brief Verifica la cadena completa sync_signal → debounce → bcd_counter.
+ * @details
+ *   TEST 1 - Reset             : btn_out=0, count_raw=0
+ *   TEST 2 - Rebote corto      : pulso < STABLE no genera btn_out
+ *   TEST 3 - Presión limpia    : btn_out=1 exactamente 1 ciclo
+ *   TEST 4 - bcd_counter incr. : un pulso limpio incrementa count_raw
+ *   TEST 5 - Rebote al soltar  : no genera pulsos extra
+ *
+ * @author hidalgojeulin
+ * @date 2026-04-27
+ */
 
 `timescale 1ns / 1ps
 

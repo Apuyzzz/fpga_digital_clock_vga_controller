@@ -1,21 +1,20 @@
-// =============================================================================
-// Testbench   : tb_fsm_adjust_mode
-// Description : Verifica la FSM de ajuste de reloj.
-//               Los outputs son REGISTRADOS (clocked), por lo que la salida
-//               de un estado aparece 1 ciclo despues de la transicion.
-//
-//   TEST 1 - Reset            : state=RUN, sec_en=1, adj_hour=0, mode_leds=00
-//   TEST 2 - RUN->ADJ_HOUR    : btn_mode cicla el estado; adj_hour=1 al ciclo sig
-//   TEST 3 - hour_inc/dec     : btn_up/btn_down generan pulso de 1 ciclo
-//   TEST 4 - ADJ_HOUR->ADJ_MIN: btn_mode cicla; adj_min=1, mode_leds=10
-//   TEST 5 - min_inc/dec      : btn_up/btn_down generan pulso de 1 ciclo
-//   TEST 6 - ADJ_MIN->RUN     : btn_mode cicla; sec_en=1, mode_leds=00
-//   TEST 7 - btn_ajuste       : retorno inmediato a RUN desde ADJ_HOUR
-//   TEST 8 - sec_rst          : se activa en cada transicion de estado
-//
-// Simulador   : Vivado xsim (Artix-7 / Nexys A7)
-// Autor       : Taller de Diseno Digital - EL3313 - I Semestre 2026
-// =============================================================================
+/**
+ * @title Testbench — fsm_adjust_mode
+ * @file tb_fsm_adjust_mode.v
+ * @brief Verifica la FSM de ajuste de reloj con salidas registradas (clocked outputs).
+ * @details
+ *   TEST 1 - Reset            : state=RUN, sec_en=1, adj_hour=0, mode_leds=00
+ *   TEST 2 - RUN→ADJ_HOUR     : btn_mode cicla el estado; adj_hour=1 al ciclo sig
+ *   TEST 3 - hour_inc/dec     : btn_up/btn_down generan pulso de 1 ciclo
+ *   TEST 4 - ADJ_HOUR→ADJ_MIN : btn_mode cicla; adj_min=1, mode_leds=10
+ *   TEST 5 - min_inc/dec      : btn_up/btn_down generan pulso de 1 ciclo
+ *   TEST 6 - ADJ_MIN→RUN      : btn_mode cicla; sec_en=1, mode_leds=00
+ *   TEST 7 - btn_ajuste       : retorno inmediato a RUN desde ADJ_HOUR
+ *   TEST 8 - sec_rst          : se activa en cada transición de estado
+ *
+ * @author JustinAlfaro
+ * @date 2026-04-28
+ */
 
 `timescale 1ns / 1ps
 
