@@ -130,9 +130,4 @@ La fuente es un bitmap bold 8 × 16 diseñado para verse limpio a escala 4×. St
 
 ---
 
-## Cómo abrir en Vivado
 
-1. Abrir Vivado 2020.x o superior.
-2. `File → Open Project` → seleccionar `Project_1/Project_1.xpr`.
-3. Ejecutar síntesis e implementación.
-4. Programar la tarjeta con el bitstream generado.
