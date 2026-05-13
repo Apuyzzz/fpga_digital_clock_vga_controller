@@ -1,6 +1,21 @@
 # FPGA Digital Clock — VGA Controller
 
-**Taller de Diseño Digital · Semestre I 2026 · Instituto Tecnológico de Costa Rica**
+**Instituto Tecnológico de Costa Rica**
+**Escuela de Ingeniería en Electrónica**
+**EL3313 — Taller de Diseño Digital · Semestre I 2026**
+**Profesor: Luis G. León-Vega, Ph.D**
+
+---
+
+**Estudiantes:**
+
+| Nombre | Carné |
+|---|---|
+| Joey Apuy Briceño | 2021108304 |
+| Justin Alfaro Araya | 2022437427 |
+| Jeulin Hidalgo Soto | 2020219634 |
+
+---
 
 Implementación de un reloj digital en FPGA con salida VGA, desarrollado sobre la tarjeta **Nexys A7-100T** (Xilinx Artix-7, xc7a100tcsg324-1).
 
@@ -122,7 +137,6 @@ fpga_digital_clock_vga_controller/
 │   └── resultados.csv                         # Resultados de testbenches
 ├── synth_results/
 │   └── utilizacion.csv                        # Utilización de recursos
-├── generate_docs.py                           # Genera DOCUMENTACION.md
 ├── DOCUMENTACION.md                           # Documentación técnica autogenerada
 ├── README.md
 └── .gitignore
@@ -157,11 +171,6 @@ fpga_digital_clock_vga_controller/
 | Parámetro | Horizontal | Vertical |
 |---|---|---|
 | Área visible | 640 px | 480 líneas |
-| Front porch | 16 px | 10 líneas |
-| Sync pulse | 96 px | 2 líneas |
-| Back porch | 48 px | 33 líneas |
-| **Total** | **800 px** | **525 líneas** |
-
 Pixel clock: 25 MHz (generado como enable de 1 de cada 4 ciclos del reloj de 100 MHz).
 
 ---
@@ -179,7 +188,7 @@ Todos los testbenches pasaron sin errores:
 | `tb_fsm_adjust_mode` | PASS | 0 | 0 |
 | `tb_hour_converter` | PASS | 0 | 0 |
 | `tb_vga_controller` | PASS | 0 | 0 |
-
+| `tb_integration` | PASS | 0 | 0 |
 ---
 
 ## Utilización de recursos (post-síntesis)
